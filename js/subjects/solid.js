@@ -63,8 +63,12 @@ CASES.push({
   plot: { x: { label: 'ε', unit: '×10⁻³', f: s => (s.e || 0) * 1000 }, series: [{ label: 'σ', unit: 'MPa', c: '--c1', f: s => (s.s || 0) / 1e6 }] },
   three: {
     cam() { return { pos: [1.2, -1.5, 3.2], target: [0, -1.5, 0] }; },
-    build(T, p) { const c = T.box(1, 0.06, 0.5, '--ink'); c.position.y = 0.03; const wire = T.cyl(1, 1, 1, '--muted'); const box = T.box(0.45, 0.4, 0.45, '--c2'); return { wire, box }; },
-    update(ob, st, p, o) { const ext = Math.min(1.2, (st.e || 0) * p.ex * 1.3), L = 2.2 + ext, r = 0.006 + p.d * 0.004; if (st.broke) { ob.wire.scale.set(r, 1.3, r); ob.wire.position.y = -0.65; ob.box.position.y = -L - 0.3 - 4 * (st.fall || 0) ** 2; } else { ob.wire.scale.set(r * (1 - ext * 0.15), L, r * (1 - ext * 0.15)); ob.wire.position.y = -L / 2; ob.box.position.y = -L - 0.2; } }
+    build(T, p) { const c = T.box(1, 0.06, 0.5, '--ink'); c.position.y = 0.03; const wire = T.cyl(1, 1, 1, '--muted'); const box = T.box(0.45, 0.4, 0.45, '--c2'), o3 = { r: 0.015, pad: 0.1 }; return { wire, box, aT: T.vec('--c3', 'T', o3), aW: T.vec('--c1', 'mg', o3) }; },
+    update(ob, st, p, o) { const ext = Math.min(1.2, (st.e || 0) * p.ex * 1.3), L = 2.2 + ext, r = 0.006 + p.d * 0.004; if (st.broke) { ob.wire.scale.set(r, 1.3, r); ob.wire.position.y = -0.65; ob.box.position.y = -L - 0.3 - 4 * (st.fall || 0) ** 2; } else { ob.wire.scale.set(r * (1 - ext * 0.15), L, r * (1 - ext * 0.15)); ob.wire.position.y = -L / 2; ob.box.position.y = -L - 0.2; }
+      const F = p.m * G * (st.f || 0), k = 0.7 / (p.m * G), y = ob.box.position.y, z = 0.25;
+      if (F > 1e-6 && !st.broke) { ob.aT.set([0.12, y + 0.2, z], [0, F * k, 0], 'T ' + fmt(F) + ' N'); ob.aW.set([-0.12, y, z], [0, -F * k, 0], 'mg ' + fmt(F) + ' N'); }
+      else if (st.broke) { ob.aT.hide(); ob.aW.set([0, y, z], [0, -0.7, 0], 'mg (ตกอิสระ)'); } else { ob.aT.hide(); ob.aW.hide(); }
+    }
   },
   notes: ['ในช่วงเส้นตรง ความเค้นแปรผันตรงกับความเครียด ความชันคือมอดุลัสของยัง ซึ่งเป็นสมบัติของวัสดุ ไม่ขึ้นกับขนาดลวด', 'ลวดยาวขึ้น 2 เท่า ยืดเพิ่ม 2 เท่า เส้นผ่านศูนย์กลางเพิ่ม 2 เท่า พื้นที่เพิ่ม 4 เท่า ยืดลดลง 4 เท่า', 'เลยจุดครากไปแล้ว เมื่อเอาน้ำหนักออก ลวดจะยาวกว่าเดิมถาวร', 'ค่าวัสดุเป็นค่าประมาณเพื่อการเรียนรู้']
 });

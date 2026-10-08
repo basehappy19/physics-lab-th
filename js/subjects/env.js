@@ -76,12 +76,15 @@ CASES.push({
       pnl.position.y = 0.9; pnl.rotation.order = 'YXZ'; pnl.rotation.y = -(p.az * RAD) + Math.PI; pnl.rotation.x = -p.tilt * RAD;
       const leg = T.cyl(0.06, 0.06, 0.9, '--muted'); leg.position.y = 0.45;
       const sun = T.sphere(0.45, '--c5', { emissive: '--c5', ei: 0.9, cast: false });
-      return { sun, lab: T.label('', '--c5') };
+      const b = p.tilt * RAD, g2 = p.az * RAD, n = [Math.sin(b) * Math.sin(g2), Math.sin(b) * Math.cos(g2), Math.cos(b)];
+      T.vec('--c2', '', { kind: 'v', r: 0.035, pad: 0.3 }).set([0, 0.95, 0], [n[0] * 1.8, n[2] * 1.8, -n[1] * 1.8], 'แนวตั้งฉากแผง');
+      return { sun, lab: T.label('', '--c5'), ray: T.vec('--c5', '', { kind: 'v', r: 0.045, pad: 0.3, tail: true }) };
     },
     update(ob, st, p, o, T) {
       const s = sunVec(p.lat, p.day, st.h); ob.sun.position.set(s[0] * 7, s[2] * 7, -s[1] * 7); ob.sun.visible = s[2] > 0;
       const V3 = T.scene.children.find(c => c.isDirectionalLight); if (V3) { V3.position.set(s[0] * 30, Math.max(0.5, s[2] * 30), -s[1] * 30); V3.intensity = s[2] > 0 ? 0.9 : 0.05; }
       const r = panelPower(p, st.h); ob.lab.set(fmt(r.P / 1000) + ' kW', [0, 2.2, 0]);
+      if (s[2] > 0) { const L = 2.6, c = [0, 0.95, 0]; ob.ray.set([c[0] + s[0] * (L + 0.3), c[1] + s[2] * (L + 0.3), c[2] - s[1] * (L + 0.3)], [-s[0] * L, -s[2] * L, s[1] * L], 'แสงอาทิตย์ มุมตกกระทบ ' + fmt(Math.acos(clamp(r.cos, 0, 1)) * DEG) + '°'); } else ob.ray.hide();
     }
   },
   notes: ['แสงตั้งฉากกับแผงได้กำลังมากที่สุด เช้าเย็นแสงต้องผ่านบรรยากาศหนาจึงอ่อนลง', 'ประเทศไทยอยู่เหนือเส้นศูนย์สูตร ดวงอาทิตย์อยู่ค่อนไปทางใต้เกือบทั้งปี แผงจึงหันทิศใต้', 'ฤดูร้อน (เม.ย.–มิ.ย.) ดวงอาทิตย์ขึ้นสูงและวันยาว ธันวาคมดวงอาทิตย์ต่ำกว่า', 'ค่าในแบบจำลองเป็นการประมาณท้องฟ้าโปร่ง ค่าจริงขึ้นกับเมฆ ฝุ่น และอุณหภูมิแผง']

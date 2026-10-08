@@ -57,8 +57,14 @@ CASES.push({
   live: [{ name: 'B', unit: 'N', f: s => s.B || 0 }, { name: 'v', unit: 'm/s', f: s => s.v }],
   three: {
     cam(p) { const W = p.W / 100; return { pos: [W * 0.9, 0.9, W * 1.6], target: [0, 0.4, 0] }; },
-    build(T, p) { const W = p.W / 100; T.floor(3, { step: 0.1 }); const glass = T.box(W, 1, W, '--water', { opacity: 0.08, cast: false }); glass.position.y = 0.5; const eg = new T.THREE.LineSegments(new T.THREE.EdgesGeometry(new T.THREE.BoxGeometry(W, 1, W)), new T.THREE.LineBasicMaterial({ color: T.color('--ink') })); eg.position.y = 0.5; T.scene.add(eg); const wat = T.box(W * 0.98, 1, W * 0.98, '--water', { opacity: 0.35, cast: false }); const blk = T.box(p.a / 100, p.a / 100, p.a / 100, '--block2'); return { wat, blk }; },
-    update(ob, st) { const H = st.H || 0.5; ob.wat.scale.y = H; ob.wat.position.y = H / 2; ob.blk.position.y = st.y + st.a / 2; }
+    build(T, p) { const W = p.W / 100; T.floor(3, { step: 0.1 }); const glass = T.box(W, 1, W, '--water', { opacity: 0.08, cast: false }); glass.position.y = 0.5; const eg = new T.THREE.LineSegments(new T.THREE.EdgesGeometry(new T.THREE.BoxGeometry(W, 1, W)), new T.THREE.LineBasicMaterial({ color: T.color('--ink') })); eg.position.y = 0.5; T.scene.add(eg); const wat = T.box(W * 0.98, 1, W * 0.98, '--water', { opacity: 0.35, cast: false }); const blk = T.box(p.a / 100, p.a / 100, p.a / 100, '--block2'), o3 = { r: 0.008, pad: 0.05 }; return { wat, blk, aW: T.vec('--c1', 'mg', o3), aB: T.vec('--c2', 'B', o3), aN: T.vec('--c3', 'N', o3) }; },
+    update(ob, st, p, o) {
+      const H = st.H || 0.5, a = st.a; ob.wat.scale.y = H; ob.wat.position.y = H / 2; ob.blk.position.y = st.y + a / 2;
+      const k = 0.32 / Math.max(o.m * G, st.B || 0, 1e-9), z = a / 2 + 0.01, yc = st.y + a / 2;
+      ob.aW.set([0, yc, z], [0, -o.m * G * k, 0], 'mg ' + fmt(o.m * G) + ' N');
+      if (st.B > 0.01) ob.aB.set([a * 0.3, yc, z], [0, st.B * k, 0], 'B ' + fmt(st.B) + ' N'); else ob.aB.hide();
+      if (st.N > 0.01) ob.aN.set([-a * 0.3, st.y, z], [0, st.N * k, 0], 'N ' + fmt(st.N) + ' N'); else ob.aN.hide();
+    }
   },
   notes: ['วัตถุลอย แรงลอยตัวเท่ากับน้ำหนักพอดี ไม่ว่าจะเป็นของเหลวอะไร แต่จมลึกต่างกัน', 'ส่วนที่จม = ρวัตถุ/ρของเหลว เช่น น้ำแข็งในน้ำจมประมาณ 92%', 'วัตถุจม แรงลอยตัวสูงสุด = ρของเหลว gV ที่เหลือพื้นรับไว้', 'ลากกล่องขึ้นลงเพื่อเปลี่ยนความสูงที่ปล่อย']
 });
@@ -133,6 +139,9 @@ CASES.push({
       const geo = new T.THREE.LatheGeometry(pts, 48); geo.rotateZ(-Math.PI / 2);
       T.mesh(geo, '--water', { opacity: 0.25, side: T.THREE.DoubleSide, cast: false });
       const balls = []; for (let i = 0; i < 140; i++) balls.push(T.sphere(0.5, '--c2', { cast: false }));
+      // เวกเตอร์ความเร็วของไหลที่หน้าตัดกว้างและแคบ
+      const v2 = p.v1 * (p.r1 / p.r2) ** 2, kv = 14 / Math.max(p.v1, v2), o3 = { kind: 'v', r: 0.45, pad: 3 };
+      [[15, p.v1, 'v₁'], [50, v2, 'v₂']].forEach(([x, v, n]) => { const r = rad(p, x); [[0, 0], [0.55, 0], [-0.55, 0], [0, 0.55], [0, -0.55]].forEach(([a, b], j) => T.vec('--c1', j ? null : '', o3).set([x - v * kv / 2, a * r, b * r], [v * kv, 0, 0], n + ' = ' + fmt(v) + ' m/s')); });
       return { balls };
     },
     update(ob, st, p) { st.P.forEach((q, i) => { const r = rad(p, q.x) * 0.85, a = i * 2.39996; ob.balls[i].position.set(q.x, q.y * r * Math.cos(a), q.y * r * Math.sin(a)); }); }

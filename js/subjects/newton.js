@@ -102,16 +102,20 @@ CASES.push({
       T.floor(Math.max(10, p.L * 2.4), { step: 1 });
       T.extrude([[0, 0], [X, 0], [X, Y]], p.L * 0.35, '--block2', { receive: true });
       const bw = p.L * 0.11, bh = p.L * 0.075, blk = T.box(bw, bh, p.L * 0.12, '--c2');
-      const ar = { W: T.arrow('--c1'), N: T.arrow('--c2'), f: T.arrow('--c3'), F: T.arrow('--c4') };
-      const lab = { W: T.label('mg', '--c1'), N: T.label('N', '--c2'), f: T.label('f', '--c3'), F: T.label('F', '--c4') };
-      return { blk, ar, lab, bh, th };
+      const o3 = { r: p.L * 0.007, pad: p.L * 0.05 }, c3 = Object.assign({ line: false, opacity: 0.55, r: p.L * 0.005 }, o3);
+      const ar = { W: T.vec('--c1', 'mg', o3), N: T.vec('--c2', 'N', o3), f: T.vec('--c3', 'f', o3), F: T.vec('--c4', 'F', o3), Wp: T.vec('--c1', 'mg sin θ', c3), Wn: T.vec('--c1', 'mg cos θ', c3), v: T.vec('--c6', 'v', Object.assign({ kind: 'v' }, o3)), a: T.vec('--c5', 'a', Object.assign({ kind: 'v' }, o3)) };
+      return { blk, ar, bh, th };
     },
     update(ob, st, p) {
       const th = ob.th, c = Math.cos(th), s = Math.sin(th), cx = st.s * c - s * ob.bh / 2, cy = st.s * s + c * ob.bh / 2;
       ob.blk.position.set(cx, cy, 0); ob.blk.rotation.z = th;
       const r = st.r, k = p.L * 0.25 / Math.max(r.W, r.N, Math.abs(r.f), p.F, 1e-9), o = [cx, cy, p.L * 0.07];
-      const set = (n, vx, vy, mag) => { ob.ar[n].set(o, [vx * mag * k, vy * mag * k, 0]); ob.lab[n].visible = mag * k > 0.05; ob.lab[n].set(null, [cx + vx * mag * k * 1.12, cy + vy * mag * k * 1.12, p.L * 0.07]); };
-      set('W', 0, -1, r.W); set('N', -s, c, r.N); set('f', c, s, r.f); set('F', Math.cos(th + p.phi * RAD), Math.sin(th + p.phi * RAD), p.F);
+      const set = (n, vx, vy, mag, t) => mag * k > 1e-4 || mag * k < -1e-4 ? ob.ar[n].set(o, [vx * mag * k, vy * mag * k, 0], t + ' ' + fmt(Math.abs(mag)) + ' N') : ob.ar[n].hide();
+      set('W', 0, -1, r.W, 'mg'); set('N', -s, c, r.N, 'N'); set('f', c, s, r.f, 'f'); set('F', Math.cos(th + p.phi * RAD), Math.sin(th + p.phi * RAD), p.F, 'F');
+      if (p.comp) { set('Wp', -c, -s, r.W * s, 'mg sin θ'); set('Wn', s, -c, r.W * c, 'mg cos θ'); } else { ob.ar.Wp.hide(); ob.ar.Wn.hide(); }
+      const ov = [cx, cy + ob.bh * 1.2, -p.L * 0.07];
+      if (Math.abs(st.v) > 1e-3) ob.ar.v.set(ov, [c * st.v * p.L * 0.05, s * st.v * p.L * 0.05, 0], 'v ' + fmt(st.v) + ' m/s'); else ob.ar.v.hide();
+      if (Math.abs(st.a) > 1e-3) ob.ar.a.set([ov[0], ov[1] + ob.bh, ov[2]], [c * st.a * p.L * 0.03, s * st.a * p.L * 0.03, 0], 'a ' + fmt(st.a) + ' m/s²'); else ob.ar.a.hide();
     }
   },
   notes: ['เพิ่มมุมจนเกินมุมวิกฤต tan⁻¹μₛ กล่องจะเริ่มไถลเองแม้ไม่มีแรงดึง', 'ขณะกล่องนิ่ง แรงเสียดทานสถิตมีค่าเท่าที่จำเป็น (ไม่ใช่ μₛN เสมอ) ดูค่า f เทียบกับแรงเสียดทานสถิตสูงสุด', 'ดึงด้วยมุม φ บวก (เชิดขึ้นจากผิว) ทำให้ N ลดลง แรงเสียดทานจึงลดตาม', 'ลากกล่องเพื่อเปลี่ยนตำแหน่งเริ่ม ลากยอดพื้นเอียงเพื่อเปลี่ยนมุม']

@@ -68,9 +68,16 @@ CASES.push({
       const P3 = tr.pts.filter((_, i) => i % 3 === 0).map(q => [q[0], q[1], 0]); P3.push([tr.pts[tr.pts.length - 1][0], tr.pts[tr.pts.length - 1][1], 0]);
       [-0.35, 0.35].forEach(z => T.tube(P3.map(q => [q[0], q[1], z]), 0.06, '--ink'));
       for (let s = 0; s <= tr.L; s += 1.2) { const q = tr.at(s); if (q.y > 0.1) { const c = T.cyl(0.06, 0.06, q.y, '--muted'); c.position.set(q.x, q.y / 2, 0); } }
-      return { ball: T.sphere(0.3, '--c1'), lab: T.label('', '--ink') };
+      const o3 = { r: 0.05, pad: 0.3 };
+      return { ball: T.sphere(0.3, '--c1'), aW: T.vec('--c1', 'mg', o3), aN: T.vec('--c2', 'N', o3), aF: T.vec('--c3', 'f', o3), aV: T.vec('--c6', 'v', Object.assign({ kind: 'v' }, o3)) };
     },
-    update(ob, st, p, o) { const q = o._T.at(st.s); ob.ball.position.set(q.x - Math.sin(q.ang) * 0.36, q.y + Math.cos(q.ang) * 0.36, 0); ob.lab.set(fmt(Math.abs(st.v)) + ' m/s', [q.x, q.y + 1, 0]); }
+    update(ob, st, p, o) {
+      const q = o._T.at(st.s), c = Math.cos(q.ang), s = Math.sin(q.ang), P = [q.x - s * 0.36, q.y + c * 0.36, 0]; ob.ball.position.set(...P);
+      const W = p.m * p.g, k = 1.6 / W, N = p.m * (p.g * c + q.k * st.v * st.v), fr = p.mu * Math.abs(N), Pf = [P[0], P[1], 0.4];
+      ob.aW.set(Pf, [0, -W * k, 0], 'mg ' + fmt(W) + ' N'); ob.aN.set(Pf, [-s * N * k, c * N * k, 0], 'N ' + fmt(N) + ' N');
+      if (p.mu > 0 && Math.abs(st.v) > 0.02) ob.aF.set(Pf, [-sgn(st.v) * c * fr * k, -sgn(st.v) * s * fr * k, 0], 'f ' + fmt(fr) + ' N'); else ob.aF.hide();
+      if (Math.abs(st.v) > 0.05) ob.aV.set([P[0], P[1], -0.4], [c * st.v * 0.25, s * st.v * 0.25, 0], 'v ' + fmt(Math.abs(st.v)) + ' m/s'); else ob.aV.hide();
+    }
   },
   notes: ['ไม่มีแรงเสียดทาน ลูกบอลขึ้นได้สูงสุดเท่าระดับพลังงานเริ่มต้น (เส้นประ) ไม่ว่ารางจะคดเคี้ยวอย่างไร', 'อัตราเร็วที่ตำแหน่งใดขึ้นกับความสูงของตำแหน่งนั้นเท่านั้น v = √(2g(h₀ − h)) ไม่ขึ้นกับมวล', 'มีแรงเสียดทาน พลังงานกลค่อยๆ กลายเป็นความร้อน แต่พลังงานรวมยังคงที่', 'ลากจุดวงกลมเพื่อปั้นราง ลากจุดเหนือลูกบอลเพื่อเลือกจุดปล่อย']
 });

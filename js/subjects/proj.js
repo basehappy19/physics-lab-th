@@ -102,9 +102,17 @@ CASES.push({
       const ball = T.sphere(Math.max(0.25, X * 0.008), '--c1'), tr = T.trail('--c1', 4000);
       ghosts.forEach(gh => T.line('--muted', { pts: gh.map(q => [q[0], q[1], 0]), max: gh.length, opacity: 0.5 }));
       const can = T.cyl(X * 0.006, X * 0.008, X * 0.05, '--ink'); can.position.set(0, p.h0, 0); can.rotation.z = p.th * RAD - Math.PI / 2;
-      return { ball, tr, lab: T.label('', '--ink'), X };
+      const o3 = { kind: 'v', r: X * 0.0025, pad: X * 0.025 }, c3 = Object.assign({}, o3, { opacity: 0.6, r: X * 0.0018 }), f3 = { r: X * 0.0025, pad: X * 0.025 };
+      return { ball, tr, X, kv: X * 0.2 / Math.max(1, p.v0), aV: T.vec('--c1', 'v', o3), aX: T.vec('--c2', 'vₓ', c3), aY: T.vec('--c3', 'v_y', c3), aW: T.vec('--c5', 'mg', f3), aD: T.vec('--c4', 'แรงต้านอากาศ', f3) };
     },
-    update(ob, st) { ob.ball.position.set(st.x, st.y, 0); if (st.t === 0) ob.tr.clear(); ob.tr.push([st.x, st.y, 0]); ob.lab.set('v = ' + fmt(Math.hypot(st.vx, st.vy)) + ' m/s', [st.x, st.y + ob.X * 0.04, 0]); }
+    update(ob, st, p) {
+      const P = [st.x, st.y, 0]; ob.ball.position.set(...P); if (st.t === 0) ob.tr.clear(); ob.tr.push(P.slice());
+      const v = Math.hypot(st.vx, st.vy), k = ob.kv, kf = ob.X * 0.09 / p.g, Pv = [st.x, st.y, ob.X * 0.01];
+      if (v > 1e-3 && !st.done) { ob.aV.set(Pv, [st.vx * k, st.vy * k, 0], 'v ' + fmt(v) + ' m/s'); } else ob.aV.hide();
+      if (p.comp && !st.done) { ob.aX.set(Pv, [st.vx * k, 0, 0], 'vₓ ' + fmt(st.vx)); Math.abs(st.vy) > 1e-3 ? ob.aY.set(Pv, [0, st.vy * k, 0], 'v_y ' + fmt(st.vy)) : ob.aY.hide(); } else { ob.aX.hide(); ob.aY.hide(); }
+      if (!st.done) ob.aW.set([st.x, st.y, -ob.X * 0.01], [0, -p.g * kf, 0], 'mg'); else ob.aW.hide();
+      if (p.drag && !st.done && v > 1e-3) { const d = p.kd * v * v; ob.aD.set([st.x, st.y, -ob.X * 0.01], [-st.vx / v * d * kf, -st.vy / v * d * kf, 0], 'แรงต้าน'); } else ob.aD.hide();
+    }
   },
   notes: ['vₓ (ลูกศรน้ำเงิน) คงที่ตลอดเมื่อไม่มีแรงต้าน มีเพียง v_y ที่เปลี่ยน', 'บนพื้นราบ มุมที่รวมกันได้ 90° (เช่น 30° กับ 60°) ตกไกลเท่ากัน', 'ยิงจากที่สูง มุมที่ไปไกลสุดน้อยกว่า 45°', 'เปิดแรงต้านอากาศ ทางเดินไม่สมมาตรอีกต่อไป ขาลงชันกว่าขาขึ้น', 'ลากปลายลำกล้องเพื่อเล็ง (ระยะลากกำหนดความเร็ว) ลากธงเพื่อย้ายเป้า']
 });
@@ -212,8 +220,8 @@ CASES.push({
   },
   three: {
     cam(p) { const R = p.u * p.u / p.g; return { pos: [R * 0.2, R * 0.45, R * 1.0], target: [R * 0.5, R * 0.15, 0] }; },
-    build(T, p) { const R = p.u * p.u / p.g; T.floor(R * 2.4, { step: K.niceStep(R / 6) }); const A = []; for (let a = p.step; a < 90; a += p.step) A.push(a); const cols = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6']; return { A, balls: A.map((a, i) => T.sphere(R * 0.012, cols[i % 6])), trs: A.map((a, i) => T.trail(cols[i % 6])) }; },
-    update(ob, st, p) { ob.A.forEach((a, i) => { const th = a * RAD, T = 2 * p.u * Math.sin(th) / p.g, t = Math.min(st.t, T), x = p.u * Math.cos(th) * t, y = p.u * Math.sin(th) * t - 0.5 * p.g * t * t; ob.balls[i].position.set(x, y, (i - ob.A.length / 2) * 0.02 * p.u); if (st.t === 0) ob.trs[i].clear(); ob.trs[i].push([x, y, (i - ob.A.length / 2) * 0.02 * p.u]); }); }
+    build(T, p) { const R = p.u * p.u / p.g; T.floor(R * 2.4, { step: K.niceStep(R / 6) }); const A = []; for (let a = p.step; a < 90; a += p.step) A.push(a); const cols = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6']; const o3 = { kind: 'v', r: R * 0.002, pad: R * 0.02 }; return { A, R, balls: A.map((a, i) => T.sphere(R * 0.012, cols[i % 6])), trs: A.map((a, i) => T.trail(cols[i % 6])), vs: A.map((a, i) => T.vec(cols[i % 6], a + '°', o3)) }; },
+    update(ob, st, p) { ob.A.forEach((a, i) => { { const th = a * RAD, T = 2 * p.u * Math.sin(th) / p.g, t = Math.min(st.t, T), x = p.u * Math.cos(th) * t, y = p.u * Math.sin(th) * t - 0.5 * p.g * t * t, k = ob.R * 0.12 / p.u; if (t < T) ob.vs[i].set([x, y, (i - ob.A.length / 2) * 0.02 * p.u], [p.u * Math.cos(th) * k, (p.u * Math.sin(th) - p.g * t) * k, 0], a + '°'); else ob.vs[i].hide(); } const th = a * RAD, T = 2 * p.u * Math.sin(th) / p.g, t = Math.min(st.t, T), x = p.u * Math.cos(th) * t, y = p.u * Math.sin(th) * t - 0.5 * p.g * t * t; ob.balls[i].position.set(x, y, (i - ob.A.length / 2) * 0.02 * p.u); if (st.t === 0) ob.trs[i].clear(); ob.trs[i].push([x, y, (i - ob.A.length / 2) * 0.02 * p.u]); }); }
   },
   notes: ['ลูกที่มุม 45° ตกไกลที่สุด', 'มุม 30° กับ 60° (หรือ 15° กับ 75°) ตกที่เดียวกัน แต่มุมสูงลอยนานกว่า', 'ทุกลูกที่ยิงด้วยอัตราเร็วเท่ากัน ตกถึงพื้นด้วยอัตราเร็วเท่ากัน']
 });

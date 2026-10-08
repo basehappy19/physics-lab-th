@@ -94,9 +94,19 @@ CASES.push({
       const wire = new T.THREE.LineSegments(new T.THREE.WireframeGeometry(new T.THREE.PlaneGeometry(10, 6, 20, 12)), new T.THREE.LineBasicMaterial({ color: T.color('--line'), transparent: true, opacity: 0.4 })); wire.rotation.x = -Math.PI / 2; wire.position.y = -2.25; T.scene.add(wire);
       p.Q.forEach(c => T.label((c.q > 0 ? '+' : '−') + Math.abs(c.q) + ' µC', c.q > 0 ? '--pos' : '--neg', { pos: [c.x, c.q > 0 ? 2.4 : -2.4, -c.y] }));
       T.label('พื้นผิวศักย์ไฟฟ้า: สูง = ศักย์บวก ต่ำ = ศักย์ลบ', '--muted', { pos: [0, 2.8, -3.2] });
-      const ball = T.sphere(0.08, '--c3'); return { ball, Vs };
+      const hY = (x, y) => Math.max(-2.2, Math.min(2.2, field(p.Q, x, y).V / Vs * 0.8));
+      // ลูกศรสนามไฟฟ้าบนพื้นผิว (ยาวตาม log ของขนาด)
+      const Em = []; for (let i = -9; i <= 9; i += 1.5) for (let j = -5; j <= 5; j += 1.25) { const x = i / 2, y = j / 2; if (p.Q.some(c => Math.hypot(x - c.x, y - c.y) < 0.45)) continue; const f = field(p.Q, x, y); if (f.E > 0) Em.push([x, y, f]); }
+      const eMax = Math.max(1e-9, ...Em.map(e => e[2].E));
+      Em.forEach(([x, y, f]) => { const L = 0.15 + 0.4 * Math.max(0, 1 + Math.log10(f.E / eMax) / 2.5); T.vec('--c3', null, { kind: 'v', r: 0.014, top: false }).set([x, hY(x, y) + 0.06, -y], [f.Ex / f.E * L, 0, -f.Ey / f.E * L]); });
+      const ball = T.sphere(0.08, '--c3'); return { ball, Vs, hY, aF: T.vec(p.tq >= 0 ? '--pos' : '--neg', 'F = qE', { r: 0.025 }), aV: T.vec('--c2', 'v', { kind: 'v', r: 0.02 }) };
     },
-    update(ob, st, p) { const V = field(p.Q, st.x, st.y).V / ob.Vs; ob.ball.position.set(st.x, Math.max(-2.2, Math.min(2.2, V * 0.8)) + 0.08, -st.y); }
+    update(ob, st, p) {
+      const P = [st.x, ob.hY(st.x, st.y) + 0.08, -st.y]; ob.ball.position.set(...P);
+      const f = field(p.Q, st.x, st.y), q = p.tq * UC, F = Math.abs(q) * f.E, sg = Math.sign(p.tq) || 1;
+      if (f.E > 0) ob.aF.set([P[0], P[1] + 0.05, P[2]], [sg * f.Ex / f.E * 0.9, 0, -sg * f.Ey / f.E * 0.9], 'F ' + fmt(F) + ' N'); else ob.aF.hide();
+      const v = Math.hypot(st.vx, st.vy); if (v > 1e-6) ob.aV.set([P[0], P[1] + 0.05, P[2]], [st.vx / v * 0.7, 0, -st.vy / v * 0.7], 'v ' + fmt(v) + ' m/s'); else ob.aV.hide();
+    }
   },
   notes: ['เส้นสนามออกจากประจุบวกและพุ่งเข้าหาประจุลบ ไม่ตัดกันเลย', 'เส้นสมศักย์ (แถบเข้ม) ตั้งฉากกับเส้นสนามเสมอ', 'ระหว่างประจุบวกสองตัวมีจุดที่สนามเป็นศูนย์ แต่ศักย์ไม่เป็นศูนย์', 'ประจุทดสอบบวกเคลื่อนที่จากศักย์สูงไปต่ำ (ไหลลงเนินในภาพ 3D) ประจุลบเคลื่อนที่กลับกัน', 'ลากประจุและจุดทดสอบได้ เพิ่มประจุได้ถึง 6 ตัว']
 });
@@ -259,8 +269,9 @@ CASES.push({
   },
   three: {
     cam(p, o) { const R = Math.max(o.r || 1, 0.5); return { pos: [R * 4, R * 3, R * 5], target: [-R, R * 1.5, 0] }; },
-    build(T, p, o) { const R = Math.max(o.r || 1, 0.5); for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) T.arrow('--muted', { r: R * 0.01 }).set([-R + i * R * 0.8, -R * 0.5, j * R * 0.8], [0, R * 4, 0]); T.label('B', '--muted', { pos: [-R + 2 * R * 0.8, R * 3.6, 2 * R * 0.8] }); return { ball: T.sphere(R * 0.06, p.q >= 0 ? '--pos' : '--neg'), tr: T.trail('--c1', 3000), aF: T.arrow('--c4', { r: R * 0.015 }), R }; },
-    update(ob, st, p, o) { const q = st.tr[st.tr.length - 1]; if (!q) return; const R = ob.R, sc = R / Math.max(o.r, 1e-9), zz = q[1] / Math.max(1e-9, Math.abs(o.pitch) || 1) * R * 0.9; const P = [q[0] * sc, zz, q[2] * sc]; ob.ball.position.set(...P); if (st.tr.length < 2) ob.tr.clear(); ob.tr.push(P); ob.aF.set(P, [-(q[0] + o.r) / o.r * R * 0.5, 0, -q[2] / o.r * R * 0.5]); }
+    build(T, p, o) { const R = Math.max(o.r || 1, 0.5); for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) T.vec('--muted', i === 2 && j === 2 ? 'B' : null, { kind: 'v', r: R * 0.008, top: false, opacity: 0.5 }).set([-R + i * R * 0.8, -R * 0.5, j * R * 0.8], [0, R * 4, 0]); return { ball: T.sphere(R * 0.06, p.q >= 0 ? '--pos' : '--neg'), tr: T.trail('--c1', 3000), aF: T.vec('--c4', 'F = qvB sinθ', { r: R * 0.015, pad: R * 0.15, ext: R * 0.6 }), aV: T.vec('--c2', 'v', { kind: 'v', r: R * 0.015, pad: R * 0.15 }), R }; },
+    update(ob, st, p, o) { const q = st.tr[st.tr.length - 1]; if (!q) return; const R = ob.R, sc = R / Math.max(o.r, 1e-9), zz = q[1] / Math.max(1e-9, Math.abs(o.pitch) || 1) * R * 0.9; const P = [q[0] * sc, zz, q[2] * sc]; ob.ball.position.set(...P); if (st.tr.length < 2) ob.tr.clear(); ob.tr.push(P); ob.aF.set(P, [-(q[0] + o.r) / o.r * R * 0.5, 0, -q[2] / o.r * R * 0.5], 'F ' + fmt(o.F) + ' N');
+      const w = 2 * Math.PI / 4 * Math.sign(p.q) * -1, d = [-o.r * Math.sin(st.ph) * w * sc, (o.pitch / 4) / Math.max(1e-9, Math.abs(o.pitch) || 1) * R * 0.9, o.r * Math.cos(st.ph) * w * sc], L = Math.hypot(...d); if (L > 1e-12) ob.aV.set(P, d.map(x => x / L * R * 0.7), 'v ' + fmt(p.v) + '×10⁵ m/s'); }
   },
   notes: ['θ = 90° ได้วงกลม θ = 0° หรือ 180° วิ่งตรงตามแนว B ไม่มีแรง มุมอื่นๆ ได้เกลียว', 'คาบไม่ขึ้นกับอัตราเร็ว อนุภาคที่เร็วกว่าวงกว้างกว่าแต่ใช้เวลาต่อรอบเท่ากัน (หลักของไซโคลตรอน)', 'ประจุบวกและลบวนคนละทิศ', 'แรงแม่เหล็กตั้งฉากกับความเร็วเสมอ จึงไม่ทำงาน อัตราเร็วคงที่']
 });

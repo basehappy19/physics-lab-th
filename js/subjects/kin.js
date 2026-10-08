@@ -77,13 +77,13 @@ CASES.push({
       for (let x = Math.ceil(x0 / 5) * 5; x < x1; x += 5) { const m = T.box(2, 0.02, 0.2, '--panel', { cast: false }); m.position.set(x, 0.01, 0); }
       const tick = K.niceStep(sp / 8); for (let x = Math.ceil(x0 / tick) * tick; x <= x1; x += tick) T.label(String(+x.toPrecision(5)), '--muted', { pos: [x, 0, 4.3] });
       const car = K.car3d(T, '--c2', Math.max(3, sp * 0.05)); car.position.z = -1.6;
-      return { car, v: T.arrow('--c1', { r: 0.12 }), a: T.arrow('--c3', { r: 0.12 }), lab: T.label('', '--c1'), marks: [], sp };
+      const o3 = { kind: 'v', r: Math.max(0.12, sp * 0.004), pad: sp * 0.03 };
+      return { car, v: T.vec('--c1', 'v', o3), a: T.vec('--c3', 'a', o3), marks: [], sp };
     },
     update(ob, st, p, o, T) {
       ob.car.position.x = st.x; const h = ob.sp * 0.12, i = o._i;
-      ob.v.set([st.x, h, -1.6], [st.v / Math.max(1, i.vmax) * ob.sp * 0.15, 0, 0]);
-      ob.a.set([st.x, h + 1.5, -1.6], [st.a / Math.max(0.5, i.amax) * ob.sp * 0.1, 0, 0]);
-      ob.lab.set('v = ' + fmt(st.v) + ' m/s', [st.x, h + 3, -1.6]);
+      ob.v.set([st.x, h, -1.6], [st.v / Math.max(1, i.vmax) * ob.sp * 0.15, 0, 0], 'v = ' + fmt(st.v) + ' m/s');
+      ob.a.set([st.x, h + ob.sp * 0.06, -1.6], [st.a / Math.max(0.5, i.amax) * ob.sp * 0.1, 0, 0], 'a = ' + fmt(st.a) + ' m/s²');
       while (ob.marks.length < st.marks.length) { const m = T.sphere(0.3, '--c4'); m.position.set(st.marks[ob.marks.length], 0.3, 1.5); ob.marks.push(m); }
     }
   },
@@ -157,9 +157,13 @@ CASES.push({
       const sp = Math.max(20, o._max - o._min), x0 = o._min - sp * 0.15, x1 = o._max + sp * 0.15;
       const road = T.box(x1 - x0, 0.2, 9, '--ground', { receive: true, cast: false }); road.position.set((x0 + x1) / 2, -0.1, 0);
       const L = Math.max(3, sp * 0.04); const A = K.car3d(T, '--c1', L), B = K.car3d(T, '--c2', L); A.position.z = 2; B.position.z = -2;
-      return { A, B, la: T.label('A', '--c1'), lb: T.label('B', '--c2'), L };
+      const vm = Math.max(1, ...[p.uA, p.uB, velAt(p.uA, p.aA, p.tA, p.T), velAt(p.uB, p.aB, p.tB, p.T)].map(Math.abs)), o3 = { kind: 'v', r: Math.max(0.12, sp * 0.004), pad: sp * 0.03 };
+      return { A, B, la: T.label('A', '--c1'), lb: T.label('B', '--c2'), L, vA: T.vec('--c1', 'v_A', o3), vB: T.vec('--c2', 'v_B', o3), kv: sp * 0.25 / vm };
     },
-    update(ob, st) { ob.A.position.x = st.xA; ob.B.position.x = st.xB; ob.A.rotation.y = st.vA < 0 ? Math.PI : 0; ob.B.rotation.y = st.vB < 0 ? Math.PI : 0; ob.la.set(null, [st.xA, ob.L * 0.8, 2]); ob.lb.set(null, [st.xB, ob.L * 0.8, -2]); }
+    update(ob, st) {
+      ob.A.position.x = st.xA; ob.B.position.x = st.xB; ob.A.rotation.y = st.vA < 0 ? Math.PI : 0; ob.B.rotation.y = st.vB < 0 ? Math.PI : 0; ob.la.set(null, [st.xA, ob.L * 0.8, 2]); ob.lb.set(null, [st.xB, ob.L * 0.8, -2]);
+      ob.vA.set([st.xA, ob.L * 1.3, 2], [st.vA * ob.kv, 0, 0], 'v_A = ' + fmt(st.vA) + ' m/s'); ob.vB.set([st.xB, ob.L * 1.3, -2], [st.vB * ob.kv, 0, 0], 'v_B = ' + fmt(st.vB) + ' m/s');
+    }
   },
   notes: ['จุดตัดของเส้น x_A กับ x_B ในกราฟคือเวลาที่รถพบกัน', 'ถ้าเส้นไม่ตัดกันเลย รถไม่พบกันภายในช่วงเวลาที่ดู ลองเพิ่มเวลาที่ดู', 'ช่วงที่ระยะห่างน้อยสุดคือขณะที่ความเร็วทั้งสองเท่ากัน', 'ลากรถในภาพเพื่อเปลี่ยนตำแหน่งเริ่มต้น']
 });
@@ -213,15 +217,19 @@ CASES.push({
   plot: { series: [{ label: 'y', unit: 'm', c: '--c2', f: s => s.y }, { label: 'v', unit: 'm/s', c: '--c1', f: s => s.v }, { label: 'a', unit: 'm/s²', c: '--c3', f: (s, p) => s.done ? 0 : -p.g }] },
   live: [{ name: 'y', unit: 'm', f: s => s.y }, { name: 'v', unit: 'm/s', f: s => s.v }, { name: 'กระดอน', unit: 'ครั้ง', f: s => s.bounces }],
   three: {
-    cam(p, o) { const H = Math.max(5, o.hmax); return { pos: [H * 0.9, H * 0.55, H * 1.1], target: [0, H * 0.45, 0] }; },
+    cam(p, o) { const H = Math.max(5, o.hmax); return { pos: [H * 1.3, H * 0.6, H * 1.7], target: [0, H * 0.5, 0] }; },
     build(T, p, o) {
       const H = Math.max(5, o.hmax), r = H * 0.03; T.floor(Math.max(20, H * 2), { step: K.niceStep(H / 4) });
       if (p.h0 > 0) { const b = T.box(H * 0.25, p.h0, H * 0.25, '--block'); b.position.set(-H * 0.14, p.h0 / 2, 0); }
       const ball = T.sphere(r, '--c1'); const tr = T.trail('--c1');
-      const lab = T.label('', '--ink');
-      return { ball, tr, lab, r, H };
+      const o3 = { kind: 'v', r: r * 0.25, pad: r * 2.5 };
+      return { ball, tr, r, H, kv: H * 0.35 / Math.max(1, o.vG), aV: T.vec('--c1', 'v', o3), aA: T.vec('--c3', 'a = g', o3) };
     },
-    update(ob, st) { ob.ball.position.set(ob.r * 1.2, st.y + ob.r, 0); ob.tr.push([ob.r * 1.2 - ob.r * 2.5, st.y + ob.r, 0]); ob.lab.set('v = ' + fmt(st.v) + ' m/s', [ob.H * 0.15, st.y + ob.r * 3, 0]); if (st.t === 0) ob.tr.clear(); }
+    update(ob, st, p) {
+      const P = [ob.r * 1.2, st.y + ob.r, 0]; ob.ball.position.set(...P); ob.tr.push([ob.r * 1.2 - ob.r * 2.5, st.y + ob.r, 0]); if (st.t === 0) ob.tr.clear();
+      if (Math.abs(st.v) > 0.05) ob.aV.set([P[0] + ob.r * 2, P[1], 0], [0, st.v * ob.kv, 0], 'v = ' + fmt(st.v) + ' m/s'); else ob.aV.hide();
+      if (!st.done) ob.aA.set([P[0] - ob.r * 2, P[1], 0], [0, -ob.H * 0.12, 0], 'a = g = ' + fmt(p.g) + ' m/s²'); else ob.aA.hide();
+    }
   },
   notes: ['ที่จุดสูงสุด v = 0 แต่ความเร่งยังเป็น g ชี้ลงเสมอ', 'เวลาขึ้นถึงจุดสูงสุดเท่ากับเวลาตกกลับลงมาที่ระดับเดิม และอัตราเร็วที่ระดับเดียวกันเท่ากัน', 'ภาพแฟลชที่ห่างกันมากขึ้นเมื่อลูกบอลตกลง แสดงว่าอัตราเร็วเพิ่มขึ้น', 'ลากลูกบอลขึ้นลงเพื่อเปลี่ยนความสูงจุดปล่อย']
 });

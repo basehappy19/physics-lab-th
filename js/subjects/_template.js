@@ -41,8 +41,12 @@ CASES.push({
   live: [{ name: 'v', unit: 'm/s', f: s => s.v }],
   three: {                                         // ไม่ใส่ก็ได้ ถ้าไม่ต้องการ 3D
     cam(p) { return { pos: [4, 3, 8], target: [4, 0, 0] }; },
-    build(T, p) { T.floor(30); return { ball: T.sphere(0.3, '--c1') }; },
-    update(ob, st) { ob.ball.position.set(st.x, 0.3, 0); }
+    build(T, p) { T.floor(30); return { ball: T.sphere(0.3, '--c1'), v: T.vec('--c1', 'v', { kind: 'v', r: 0.05 }), f: T.vec('--c3', 'f', { r: 0.05 }) }; },
+    update(ob, st, p) {
+      ob.ball.position.set(st.x, 0.3, 0);
+      // เวกเตอร์ 3D เปิด/ปิดได้จากปุ่มในแถบเครื่องมือ: .set(จุดเริ่ม, เวกเตอร์ (หน่วยโลก), ข้อความป้าย) / .hide()
+      if (st.v > 0) { ob.v.set([st.x, 0.9, 0], [st.v * 0.3, 0, 0], 'v = ' + fmt(st.v) + ' m/s'); ob.f.set([st.x, 0.3, 0.35], [-1, 0, 0], 'แรงเสียดทาน'); } else { ob.v.hide(); ob.f.hide(); }
+    }
   },
   notes: ['ข้อสังเกตข้อที่ 1', 'ข้อสังเกตข้อที่ 2']
 });

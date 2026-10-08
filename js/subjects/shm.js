@@ -56,11 +56,22 @@ CASES.push({
       const s = 0.12 + 0.06 * Math.cbrt(p.m);
       if (p.ori === 'h') { T.floor(3, { step: 0.1 }); const w = T.box(0.05, 0.4, 0.4, '--ground'); w.position.set(-0.92, 0.2, 0); }
       else { const c = T.box(0.8, 0.04, 0.4, '--ink'); c.position.y = 0.02; }
-      return { spr: T.spring('--spring', { coils: 14, r: 0.035 }), box: T.box(s, s, s, '--c2'), s };
+      const o3 = { r: 0.008, pad: 0.05 }, v3 = Object.assign({ kind: 'v' }, o3);
+      return { spr: T.spring('--spring', { coils: 14, r: 0.035 }), box: T.box(s, s, s, '--c2'), s, aS: T.vec('--c4', 'แรงสปริง', o3), aW: T.vec('--c1', 'mg', o3), aV: T.vec('--c1', 'v', v3), aA: T.vec('--c3', 'a', v3) };
     },
     update(ob, st, p, o) {
-      if (p.ori === 'h') { ob.box.position.set(st.x, ob.s / 2, 0); ob.spr.set2([-0.9, ob.s / 2, 0], [st.x - ob.s / 2, ob.s / 2, 0]); }
-      else { const yeq = -0.35 - o.xeq * 0.6 - 0.15, y = yeq - st.x * 0.6; ob.box.position.set(0, y, 0); ob.spr.set2([0, 0, 0], [0, y + ob.s / 2, 0]); }
+      const Amp = Math.max(o.Amp, 0.05), kf = 0.3 / Math.max(p.k * (Amp + (p.ori === 'h' ? 0 : o.xeq)), p.m * p.g, 1e-9), kv = 0.25 / Math.max(1e-6, Amp * o.w), ka = 0.2 / Math.max(1e-6, Amp * o.w * o.w);
+      if (p.ori === 'h') {
+        const P = [st.x, ob.s / 2, ob.s / 2 + 0.01]; ob.box.position.set(st.x, ob.s / 2, 0); ob.spr.set2([-0.9, ob.s / 2, 0], [st.x - ob.s / 2, ob.s / 2, 0]);
+        const F = -p.k * st.x; Math.abs(F) > 1e-6 ? ob.aS.set(P, [F * kf, 0, 0], 'F = −kx = ' + fmt(F) + ' N') : ob.aS.hide(); ob.aW.hide();
+        Math.abs(st.v) > 1e-3 ? ob.aV.set([st.x, ob.s + 0.06, 0], [st.v * kv, 0, 0], 'v ' + fmt(st.v) + ' m/s') : ob.aV.hide();
+        Math.abs(st.a) > 1e-3 ? ob.aA.set([st.x, ob.s + 0.16, 0], [st.a * ka, 0, 0], 'a ' + fmt(st.a) + ' m/s²') : ob.aA.hide();
+      } else {
+        const yeq = -0.35 - o.xeq * 0.6 - 0.15, y = yeq - st.x * 0.6, P = [0, y, ob.s / 2 + 0.01]; ob.box.position.set(0, y, 0); ob.spr.set2([0, 0, 0], [0, y + ob.s / 2, 0]);
+        const Fs = p.k * (o.xeq + st.x); ob.aS.set(P, [0, Fs * kf, 0], 'แรงสปริง ' + fmt(Fs) + ' N'); ob.aW.set(P, [0, -p.m * p.g * kf, 0], 'mg ' + fmt(p.m * p.g) + ' N');
+        Math.abs(st.v) > 1e-3 ? ob.aV.set([ob.s * 0.9, y, 0], [0, -st.v * kv, 0], 'v') : ob.aV.hide();
+        Math.abs(st.a) > 1e-3 ? ob.aA.set([-ob.s * 0.9, y, 0], [0, -st.a * ka, 0], 'a') : ob.aA.hide();
+      }
     }
   },
   notes: ['x กับ a มีทิศตรงข้ามเสมอ ความเร่งมากที่สุดที่ปลายสุด และเป็นศูนย์ที่จุดสมดุล', 'อัตราเร็วมากที่สุดที่จุดสมดุล เป็นศูนย์ที่ปลายสุด', 'คาบไม่ขึ้นกับแอมพลิจูด (ลองดึงมากน้อยต่างกัน)', 'สปริงแนวดิ่งมีคาบเท่าแนวระดับ แรงโน้มถ่วงเพียงเลื่อนจุดสมดุลลง', 'ลากกล่องเพื่อกำหนดระยะดึงเริ่มต้น']
@@ -105,8 +116,14 @@ CASES.push({
   live: [{ name: 'θ', unit: '°', f: s => s.th * DEG }, { name: 'v', unit: 'm/s', f: (s, p) => s.w * p.L }],
   three: {
     cam(p) { return { pos: [p.L * 0.8, -p.L * 0.2, p.L * 2.2], target: [0, -p.L * 0.6, 0] }; },
-    build(T, p) { const c = T.box(p.L * 0.6, 0.03, 0.3, '--ink'); c.position.y = 0.015; T.floor(p.L * 4, { y: -p.L * 1.25, step: 0.25 }); return { rope: T.line('--rope', { max: 2 }), bob: T.sphere(0.05 * p.L + 0.02, '--c1'), tr: T.trail('--c1', 600) }; },
-    update(ob, st, p) { const x = p.L * Math.sin(st.th), y = -p.L * Math.cos(st.th); ob.rope.set([[0, 0, 0], [x, y, 0]]); ob.bob.position.set(x, y, 0); ob.tr.push([x, y, 0]); }
+    build(T, p) { const c = T.box(p.L * 0.6, 0.03, 0.3, '--ink'); c.position.y = 0.015; T.floor(p.L * 4, { y: -p.L * 1.25, step: 0.25 }); const o3 = { r: 0.006 * p.L + 0.002, pad: 0.06 * p.L }; return { rope: T.line('--rope', { max: 2 }), bob: T.sphere(0.05 * p.L + 0.02, '--c1'), tr: T.trail('--c1', 600), aT: T.vec('--c4', 'T', o3), aW: T.vec('--c1', 'mg', o3), aR: T.vec('--c3', 'mg sin θ', Object.assign({ line: false, opacity: 0.6 }, o3)), aV: T.vec('--c2', 'v', Object.assign({ kind: 'v' }, o3)) }; },
+    update(ob, st, p, o) {
+      const s = Math.sin(st.th), c = Math.cos(st.th), x = p.L * s, y = -p.L * c; ob.rope.set([[0, 0, 0], [x, y, 0]]); ob.bob.position.set(x, y, 0); ob.tr.push([x, y, 0]);
+      const W = p.m * p.g, Tn = p.m * (p.g * c + p.L * st.w * st.w), k = p.L * 0.4 / Math.max(W, o.Tmax, 1e-9), P = [x, y, 0.05 * p.L + 0.03], v = st.w * p.L;
+      ob.aT.set(P, [-s * Tn * k, c * Tn * k, 0], 'T ' + fmt(Tn) + ' N'); ob.aW.set(P, [0, -W * k, 0], 'mg ' + fmt(W) + ' N');
+      Math.abs(s) > 1e-3 ? ob.aR.set(P, [-c * W * s * k, -s * W * s * k, 0], 'mg sin θ') : ob.aR.hide();
+      Math.abs(v) > 0.02 ? ob.aV.set([x, y, -0.05 * p.L - 0.03], [c * v * p.L * 0.15, s * v * p.L * 0.15, 0], 'v ' + fmt(Math.abs(v)) + ' m/s') : ob.aV.hide();
+    }
   },
   notes: ['คาบไม่ขึ้นกับมวล และแทบไม่ขึ้นกับมุมถ้ามุมเล็ก (น้อยกว่าประมาณ 15°)', 'ที่มุม 90° คาบจริงยาวกว่าสูตรมุมเล็กประมาณ 18%', 'แรงดึงกลับคือ mg sin θ ซึ่งแปรผันตาม θ เฉพาะเมื่อมุมเล็ก จึงเป็น SHM โดยประมาณ', 'ลากลูกตุ้มเพื่อเลือกมุมปล่อย']
 });

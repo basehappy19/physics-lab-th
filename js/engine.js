@@ -246,7 +246,7 @@ const Lab = (function () {
       (hasStep ? `<button class="pb" id="play" aria-label="เล่น/หยุด"></button><button class="pb" id="restart" title="เริ่มใหม่">↺</button>` +
         `<label class="spd">ความเร็ว <select id="speed">${[0.1, 0.25, 0.5, 1, 2, 4].map(v => `<option value="${v}" ${v === speed ? 'selected' : ''}>${v}×</option>`).join('')}</select></label><span class="tm" id="tm"></span>` : '') +
       (c.actions || []).map((a, k) => `<button class="act" data-act="${k}">${a.label}</button>`).join('') +
-      (c.three && V3 ? `<button class="act" id="camreset" title="มุมกล้องเริ่มต้น" ${view === '3d' ? '' : 'hidden'}>มุมกล้องเริ่มต้น</button>` : '');
+      (c.three && V3 ? `<button class="act" id="camreset" title="มุมกล้องเริ่มต้น" ${view === '3d' ? '' : 'hidden'}>มุมกล้องเริ่มต้น</button><div class="seg sm vecbar" id="v3vec" hidden></div>` : '');
     if (!$('#vbar').innerHTML.trim()) $('#vbar').hidden = true;
     const vm = $('#vmode'); if (vm) vm.onclick = e => { const b = e.target.closest('button'); if (!b) return; setView(b.dataset.v); };
     if (hasStep) {
@@ -257,10 +257,20 @@ const Lab = (function () {
     }
     $('#vbar').querySelectorAll('[data-act]').forEach(b => b.onclick = () => { c.actions[+b.dataset.act].run(P, st, O); renderControls(); changed(true); });
     const cr = $('#camreset'); if (cr) cr.onclick = () => { V3.resetCam(); v3stale = true; };
+    const vb = $('#v3vec'); if (vb) vb.onclick = e => { const b = e.target.closest('button'); if (!b) return; V3.toggle(b.dataset.k); b.setAttribute('aria-pressed', String(!!V3.show[b.dataset.k])); };
+  }
+  // ปุ่มเปิด/ปิดเวกเตอร์ในมุมมอง 3D (แสดงเฉพาะชนิดที่แบบจำลองนั้นใช้)
+  function vecBar() {
+    const vb = $('#v3vec'); if (!vb || !V3) return;
+    const ks = Lab.V3.KINDS.filter(([k]) => k === 'val' ? V3.kinds.size : V3.kinds.has(k));
+    vb.hidden = view !== '3d' || !V3.kinds.size;
+    const html = '<span class="vl">แสดง</span>' + ks.map(([k, n]) => `<button data-k="${k}" aria-pressed="${!!V3.show[k]}">${n}</button>`).join('');
+    if (vb.innerHTML !== html) vb.innerHTML = html;
   }
   function setView(v) {
     view = v; $('#vmode') && $('#vmode').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
     const cr = $('#camreset'); if (cr) cr.hidden = v !== '3d';
+    vecBar();
     resizeView(); v3stale = true; dirty = true;
   }
   function togglePlay() {
@@ -339,7 +349,7 @@ const Lab = (function () {
     if (playing && cur.sim && cur.sim.step) { stepSim(realDt); dirty = true; }
     const show3 = view === '3d' && cur.three && V3;
     if (show3) {
-      if (v3stale) { V3.build(cur, P, O, true); v3stale = false; }
+      if (v3stale) { V3.build(cur, P, O, true); v3stale = false; vecBar(); }
       V3.render(st, P, O);
     } else if (dirty && cur.sim && cur.sim.draw) {
       G.clear(); G.frame(cur.sim.view(P, O, st)); cur.sim.draw(G, st, P, O);

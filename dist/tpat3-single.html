@@ -223,6 +223,7 @@ header p{margin:6px 0 0;color:var(--muted);max-width:75ch}
 .seg{display:flex;gap:2px;flex-wrap:wrap;margin-top:6px;background:var(--seg);border-radius:10px;padding:3px;width:fit-content;max-width:100%}
 .seg button{font:inherit;font-size:.88rem;padding:4px 12px;border:0;background:none;color:var(--ink);border-radius:8px;cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--seg-on);box-shadow:0 1px 3px rgba(0,0,0,.14);font-weight:600}
+.vecbar .vl{font-size:.78rem;color:var(--muted);padding:3px 6px 3px 8px;align-self:center}
 .seg.sm{margin:0}.seg.sm button{padding:3px 12px}
 .list{border-radius:var(--r-md);padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--glass-2);border:1px solid var(--hair)}
 .list-h{display:flex;justify-content:space-between;font-weight:600}
@@ -582,7 +583,7 @@ const Lab = (function () {
       (hasStep ? `<button class="pb" id="play" aria-label="เล่น/หยุด"></button><button class="pb" id="restart" title="เริ่มใหม่">↺</button>` +
         `<label class="spd">ความเร็ว <select id="speed">${[0.1, 0.25, 0.5, 1, 2, 4].map(v => `<option value="${v}" ${v === speed ? 'selected' : ''}>${v}×</option>`).join('')}</select></label><span class="tm" id="tm"></span>` : '') +
       (c.actions || []).map((a, k) => `<button class="act" data-act="${k}">${a.label}</button>`).join('') +
-      (c.three && V3 ? `<button class="act" id="camreset" title="มุมกล้องเริ่มต้น" ${view === '3d' ? '' : 'hidden'}>มุมกล้องเริ่มต้น</button>` : '');
+      (c.three && V3 ? `<button class="act" id="camreset" title="มุมกล้องเริ่มต้น" ${view === '3d' ? '' : 'hidden'}>มุมกล้องเริ่มต้น</button><div class="seg sm vecbar" id="v3vec" hidden></div>` : '');
     if (!$('#vbar').innerHTML.trim()) $('#vbar').hidden = true;
     const vm = $('#vmode'); if (vm) vm.onclick = e => { const b = e.target.closest('button'); if (!b) return; setView(b.dataset.v); };
     if (hasStep) {
@@ -593,10 +594,20 @@ const Lab = (function () {
     }
     $('#vbar').querySelectorAll('[data-act]').forEach(b => b.onclick = () => { c.actions[+b.dataset.act].run(P, st, O); renderControls(); changed(true); });
     const cr = $('#camreset'); if (cr) cr.onclick = () => { V3.resetCam(); v3stale = true; };
+    const vb = $('#v3vec'); if (vb) vb.onclick = e => { const b = e.target.closest('button'); if (!b) return; V3.toggle(b.dataset.k); b.setAttribute('aria-pressed', String(!!V3.show[b.dataset.k])); };
+  }
+  // ปุ่มเปิด/ปิดเวกเตอร์ในมุมมอง 3D (แสดงเฉพาะชนิดที่แบบจำลองนั้นใช้)
+  function vecBar() {
+    const vb = $('#v3vec'); if (!vb || !V3) return;
+    const ks = Lab.V3.KINDS.filter(([k]) => k === 'val' ? V3.kinds.size : V3.kinds.has(k));
+    vb.hidden = view !== '3d' || !V3.kinds.size;
+    const html = '<span class="vl">แสดง</span>' + ks.map(([k, n]) => `<button data-k="${k}" aria-pressed="${!!V3.show[k]}">${n}</button>`).join('');
+    if (vb.innerHTML !== html) vb.innerHTML = html;
   }
   function setView(v) {
     view = v; $('#vmode') && $('#vmode').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
     const cr = $('#camreset'); if (cr) cr.hidden = v !== '3d';
+    vecBar();
     resizeView(); v3stale = true; dirty = true;
   }
   function togglePlay() {
@@ -675,7 +686,7 @@ const Lab = (function () {
     if (playing && cur.sim && cur.sim.step) { stepSim(realDt); dirty = true; }
     const show3 = view === '3d' && cur.three && V3;
     if (show3) {
-      if (v3stale) { V3.build(cur, P, O, true); v3stale = false; }
+      if (v3stale) { V3.build(cur, P, O, true); v3stale = false; vecBar(); }
       V3.render(st, P, O);
     } else if (dirty && cur.sim && cur.sim.draw) {
       G.clear(); G.frame(cur.sim.view(P, O, st)); cur.sim.draw(G, st, P, O);
@@ -1061,7 +1072,12 @@ function V3(host) {
   this.orb = { r: 10, th: 0.6, ph: 1.1, target: new THREE.Vector3() };
   this._bindControls();
   this.scene = null; this.obj = null; this.labels = [];
+  // ชั้นเวกเตอร์ที่เปิด/ปิดได้: f แรง, v ความเร็ว/ความเร่ง/โมเมนตัม/สนาม, line แนวแรง, val ป้ายค่า
+  this.show = { f: true, v: true, line: false, val: true };
+  try { Object.assign(this.show, JSON.parse(localStorage.getItem('tpat3.vec3d') || '{}')); } catch (e) { }
+  this.kinds = new Set();
 }
+V3.KINDS = [['f', 'แรง'], ['v', 'ความเร็ว/อื่นๆ'], ['line', 'แนวแรง'], ['val', 'ป้ายค่า']];
 const P = V3.prototype;
 
 P._bindControls = function () {
@@ -1093,7 +1109,7 @@ P._applyCam = function () {
 P.dispose = function () {
   if (!this.scene) return;
   this.scene.traverse(m => { if (m.geometry) m.geometry.dispose(); if (m.material) [].concat(m.material).forEach(x => x.dispose()); });
-  this.labelLayer.innerHTML = ''; this.labels = []; this.scene = null; this.obj = null;
+  this.labelLayer.innerHTML = ''; this.labels = []; this.scene = null; this.obj = null; this.kinds = new Set();
 };
 // สร้างฉากใหม่ keepCam = true เพื่อคงมุมกล้องเดิม
 P.build = function (cs, Pm, o, keepCam) {
@@ -1105,24 +1121,35 @@ P.build = function (cs, Pm, o, keepCam) {
   sun.shadow.mapSize.set(1024, 1024); const sc = cs.three.shadow || 20;
   Object.assign(sun.shadow.camera, { left: -sc, right: sc, top: sc, bottom: -sc, near: 0.5, far: 200 }); sun.shadow.bias = -0.0005;
   scene.add(sun); this.sun = sun;
+  this.layers = { f: new THREE.Group(), v: new THREE.Group(), line: new THREE.Group() };
+  Object.values(this.layers).forEach(g => scene.add(g));
   const T = this.helpers();
   if (!keepCam || !this._camSet) { const cm = cs.three.cam ? cs.three.cam(Pm, o) : { pos: [6, 5, 10], target: [0, 1, 0] }; this.setCam(cm.pos, cm.target); this._camSet = true; }
   this.T = T;
   this.obj = cs.three.build(T, Pm, o) || {};
 };
 P.resetCam = function () { this._camSet = false; };
+P.toggle = function (k) { this.show[k] = !this.show[k]; try { localStorage.setItem('tpat3.vec3d', JSON.stringify(this.show)); } catch (e) { } };
 P.render = function (st, Pm, o) {
   if (!this.scene) return;
   if (this.cs.three.update) this.cs.three.update(this.obj, st, Pm, o, this.T);
+  const sh = this.show; for (const k in this.layers) this.layers[k].visible = !!sh[k] && (k !== 'line' || !!sh.f);
   this._applyCam();
   this.renderer.render(this.scene, this.camera);
   // ป้ายข้อความ
-  const v = new THREE.Vector3();
+  const v = new THREE.Vector3(), u = new THREE.Vector3();
   this.labels.forEach(l => {
-    if (!l.visible) { l.el.style.display = 'none'; return; }
+    if (!l.visible || (l.kind && (!this.show[l.kind] || !this.show.val || (l.arrow && !l.arrow.visible)))) { l.el.style.display = 'none'; return; }
     v.copy(l.pos).project(this.camera);
     if (v.z > 1) { l.el.style.display = 'none'; return; }
-    l.el.style.display = ''; l.el.style.transform = `translate(-50%,-50%) translate(${(v.x + 1) / 2 * this.w}px,${(1 - v.y) / 2 * this.h}px)`;
+    l.el.style.display = '';
+    let px = (v.x + 1) / 2 * this.w, py = (1 - v.y) / 2 * this.h;
+    if (l.push && l.from) {   // ป้ายของเวกเตอร์: เลื่อนออกไปตามทิศลูกศรบนจอ ไม่ให้บังหัวลูกศร
+      u.copy(l.from).project(this.camera); let dx = px - (u.x + 1) / 2 * this.w, dy = py - (1 - u.y) / 2 * this.h; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+      const bw = l.el.offsetWidth / 2, bh = l.el.offsetHeight / 2, m = 6 + Math.min(bw / Math.max(Math.abs(dx), 1e-3), bh / Math.max(Math.abs(dy), 1e-3));
+      px += dx * m; py += dy * m;
+    }
+    l.el.style.transform = `translate(-50%,-50%) translate(${px}px,${py}px)`;
   });
 };
 
@@ -1156,6 +1183,25 @@ P.helpers = function () {
         g.position.set(...org); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), V.normalize()); return g;
       };
       return g;
+    },
+    // เวกเตอร์ที่เปิด/ปิดได้จากแถบเครื่องมือ: kind 'f' (แรง ค่าเริ่มต้น) หรือ 'v' (ความเร็ว ความเร่ง ฯลฯ)
+    // v = T.vec('--c1', 'mg', {kind:'f'}); v.set(origin, vec, 'mg = 9.8 N') — ความยาวเป็นหน่วยโลก (m) ให้ผู้เรียกปรับสเกลเอง
+    // แรง (kind 'f') มีเส้นประแสดงแนวแรงด้วย (เปิดด้วยปุ่ม "แนวแรง")
+    vec(c, text, o = {}) {
+      const kind = o.kind || 'f'; self.kinds.add(kind); if (kind === 'f' && o.line !== false) self.kinds.add('line');
+      const a = T.arrow(c, { r: o.r || 0.035, parent: self.layers[kind] }); a.children.forEach(m => { if (o.opacity) { m.material.transparent = true; m.material.opacity = o.opacity; } if (o.top !== false) { m.material.depthTest = false; m.material.transparent = true; m.renderOrder = 10; m.castShadow = false; } });
+      const lab = text != null ? T.label(text, c) : null; if (lab) { lab.kind = kind; lab.arrow = a; lab.el.classList.add('vlab'); }
+      const rr = o.r || 0.035, ln = kind === 'f' && o.line !== false ? T.line(c, { max: 2, dash: rr * 2.5, parent: self.layers.line }) : null; if (ln) { ln.material.depthTest = false; ln.material.transparent = true; ln.renderOrder = 9; }
+      const V = new THREE.Vector3();
+      a.set2 = a.set;
+      a.set = (org, vec, t) => {
+        a.set2(org, vec); V.set(...vec); const L = V.length();
+        if (lab) { const k = o.mid ? 0.5 : o.tail ? 0 : 1; lab.set(t != null ? t : null, [org[0] + vec[0] * k, org[1] + vec[1] * k, org[2] + vec[2] * k]); lab.from = lab.from || new THREE.Vector3(); lab.from.set(org[0] + vec[0] * (o.mid ? 0 : o.tail ? 1 : 0), org[1] + vec[1] * (o.mid ? 0 : o.tail ? 1 : 0), org[2] + vec[2] * (o.mid ? 0 : o.tail ? 1 : 0)); lab.push = !o.mid; }
+        if (ln) { ln.visible = a.visible; if (a.visible) { const e = (o.ext != null ? o.ext : rr * 40) / L; ln.set([[org[0] - vec[0] * e, org[1] - vec[1] * e, org[2] - vec[2] * e], [org[0] + vec[0] * (1 + e), org[1] + vec[1] * (1 + e), org[2] + vec[2] * (1 + e)]]); } }
+        return a;
+      };
+      a.hide = () => { a.visible = false; if (ln) ln.visible = false; return a; };
+      return a;
     },
     // เส้นจากรายการจุด l.set(pts)
     line(c, o = {}) {
@@ -1646,13 +1692,13 @@ CASES.push({
       for (let x = Math.ceil(x0 / 5) * 5; x < x1; x += 5) { const m = T.box(2, 0.02, 0.2, '--panel', { cast: false }); m.position.set(x, 0.01, 0); }
       const tick = K.niceStep(sp / 8); for (let x = Math.ceil(x0 / tick) * tick; x <= x1; x += tick) T.label(String(+x.toPrecision(5)), '--muted', { pos: [x, 0, 4.3] });
       const car = K.car3d(T, '--c2', Math.max(3, sp * 0.05)); car.position.z = -1.6;
-      return { car, v: T.arrow('--c1', { r: 0.12 }), a: T.arrow('--c3', { r: 0.12 }), lab: T.label('', '--c1'), marks: [], sp };
+      const o3 = { kind: 'v', r: Math.max(0.12, sp * 0.004), pad: sp * 0.03 };
+      return { car, v: T.vec('--c1', 'v', o3), a: T.vec('--c3', 'a', o3), marks: [], sp };
     },
     update(ob, st, p, o, T) {
       ob.car.position.x = st.x; const h = ob.sp * 0.12, i = o._i;
-      ob.v.set([st.x, h, -1.6], [st.v / Math.max(1, i.vmax) * ob.sp * 0.15, 0, 0]);
-      ob.a.set([st.x, h + 1.5, -1.6], [st.a / Math.max(0.5, i.amax) * ob.sp * 0.1, 0, 0]);
-      ob.lab.set('v = ' + fmt(st.v) + ' m/s', [st.x, h + 3, -1.6]);
+      ob.v.set([st.x, h, -1.6], [st.v / Math.max(1, i.vmax) * ob.sp * 0.15, 0, 0], 'v = ' + fmt(st.v) + ' m/s');
+      ob.a.set([st.x, h + ob.sp * 0.06, -1.6], [st.a / Math.max(0.5, i.amax) * ob.sp * 0.1, 0, 0], 'a = ' + fmt(st.a) + ' m/s²');
       while (ob.marks.length < st.marks.length) { const m = T.sphere(0.3, '--c4'); m.position.set(st.marks[ob.marks.length], 0.3, 1.5); ob.marks.push(m); }
     }
   },
@@ -1726,9 +1772,13 @@ CASES.push({
       const sp = Math.max(20, o._max - o._min), x0 = o._min - sp * 0.15, x1 = o._max + sp * 0.15;
       const road = T.box(x1 - x0, 0.2, 9, '--ground', { receive: true, cast: false }); road.position.set((x0 + x1) / 2, -0.1, 0);
       const L = Math.max(3, sp * 0.04); const A = K.car3d(T, '--c1', L), B = K.car3d(T, '--c2', L); A.position.z = 2; B.position.z = -2;
-      return { A, B, la: T.label('A', '--c1'), lb: T.label('B', '--c2'), L };
+      const vm = Math.max(1, ...[p.uA, p.uB, velAt(p.uA, p.aA, p.tA, p.T), velAt(p.uB, p.aB, p.tB, p.T)].map(Math.abs)), o3 = { kind: 'v', r: Math.max(0.12, sp * 0.004), pad: sp * 0.03 };
+      return { A, B, la: T.label('A', '--c1'), lb: T.label('B', '--c2'), L, vA: T.vec('--c1', 'v_A', o3), vB: T.vec('--c2', 'v_B', o3), kv: sp * 0.25 / vm };
     },
-    update(ob, st) { ob.A.position.x = st.xA; ob.B.position.x = st.xB; ob.A.rotation.y = st.vA < 0 ? Math.PI : 0; ob.B.rotation.y = st.vB < 0 ? Math.PI : 0; ob.la.set(null, [st.xA, ob.L * 0.8, 2]); ob.lb.set(null, [st.xB, ob.L * 0.8, -2]); }
+    update(ob, st) {
+      ob.A.position.x = st.xA; ob.B.position.x = st.xB; ob.A.rotation.y = st.vA < 0 ? Math.PI : 0; ob.B.rotation.y = st.vB < 0 ? Math.PI : 0; ob.la.set(null, [st.xA, ob.L * 0.8, 2]); ob.lb.set(null, [st.xB, ob.L * 0.8, -2]);
+      ob.vA.set([st.xA, ob.L * 1.3, 2], [st.vA * ob.kv, 0, 0], 'v_A = ' + fmt(st.vA) + ' m/s'); ob.vB.set([st.xB, ob.L * 1.3, -2], [st.vB * ob.kv, 0, 0], 'v_B = ' + fmt(st.vB) + ' m/s');
+    }
   },
   notes: ['จุดตัดของเส้น x_A กับ x_B ในกราฟคือเวลาที่รถพบกัน', 'ถ้าเส้นไม่ตัดกันเลย รถไม่พบกันภายในช่วงเวลาที่ดู ลองเพิ่มเวลาที่ดู', 'ช่วงที่ระยะห่างน้อยสุดคือขณะที่ความเร็วทั้งสองเท่ากัน', 'ลากรถในภาพเพื่อเปลี่ยนตำแหน่งเริ่มต้น']
 });
@@ -1782,15 +1832,19 @@ CASES.push({
   plot: { series: [{ label: 'y', unit: 'm', c: '--c2', f: s => s.y }, { label: 'v', unit: 'm/s', c: '--c1', f: s => s.v }, { label: 'a', unit: 'm/s²', c: '--c3', f: (s, p) => s.done ? 0 : -p.g }] },
   live: [{ name: 'y', unit: 'm', f: s => s.y }, { name: 'v', unit: 'm/s', f: s => s.v }, { name: 'กระดอน', unit: 'ครั้ง', f: s => s.bounces }],
   three: {
-    cam(p, o) { const H = Math.max(5, o.hmax); return { pos: [H * 0.9, H * 0.55, H * 1.1], target: [0, H * 0.45, 0] }; },
+    cam(p, o) { const H = Math.max(5, o.hmax); return { pos: [H * 1.3, H * 0.6, H * 1.7], target: [0, H * 0.5, 0] }; },
     build(T, p, o) {
       const H = Math.max(5, o.hmax), r = H * 0.03; T.floor(Math.max(20, H * 2), { step: K.niceStep(H / 4) });
       if (p.h0 > 0) { const b = T.box(H * 0.25, p.h0, H * 0.25, '--block'); b.position.set(-H * 0.14, p.h0 / 2, 0); }
       const ball = T.sphere(r, '--c1'); const tr = T.trail('--c1');
-      const lab = T.label('', '--ink');
-      return { ball, tr, lab, r, H };
+      const o3 = { kind: 'v', r: r * 0.25, pad: r * 2.5 };
+      return { ball, tr, r, H, kv: H * 0.35 / Math.max(1, o.vG), aV: T.vec('--c1', 'v', o3), aA: T.vec('--c3', 'a = g', o3) };
     },
-    update(ob, st) { ob.ball.position.set(ob.r * 1.2, st.y + ob.r, 0); ob.tr.push([ob.r * 1.2 - ob.r * 2.5, st.y + ob.r, 0]); ob.lab.set('v = ' + fmt(st.v) + ' m/s', [ob.H * 0.15, st.y + ob.r * 3, 0]); if (st.t === 0) ob.tr.clear(); }
+    update(ob, st, p) {
+      const P = [ob.r * 1.2, st.y + ob.r, 0]; ob.ball.position.set(...P); ob.tr.push([ob.r * 1.2 - ob.r * 2.5, st.y + ob.r, 0]); if (st.t === 0) ob.tr.clear();
+      if (Math.abs(st.v) > 0.05) ob.aV.set([P[0] + ob.r * 2, P[1], 0], [0, st.v * ob.kv, 0], 'v = ' + fmt(st.v) + ' m/s'); else ob.aV.hide();
+      if (!st.done) ob.aA.set([P[0] - ob.r * 2, P[1], 0], [0, -ob.H * 0.12, 0], 'a = g = ' + fmt(p.g) + ' m/s²'); else ob.aA.hide();
+    }
   },
   notes: ['ที่จุดสูงสุด v = 0 แต่ความเร่งยังเป็น g ชี้ลงเสมอ', 'เวลาขึ้นถึงจุดสูงสุดเท่ากับเวลาตกกลับลงมาที่ระดับเดิม และอัตราเร็วที่ระดับเดียวกันเท่ากัน', 'ภาพแฟลชที่ห่างกันมากขึ้นเมื่อลูกบอลตกลง แสดงว่าอัตราเร็วเพิ่มขึ้น', 'ลากลูกบอลขึ้นลงเพื่อเปลี่ยนความสูงจุดปล่อย']
 });
@@ -1904,16 +1958,20 @@ CASES.push({
       T.floor(Math.max(10, p.L * 2.4), { step: 1 });
       T.extrude([[0, 0], [X, 0], [X, Y]], p.L * 0.35, '--block2', { receive: true });
       const bw = p.L * 0.11, bh = p.L * 0.075, blk = T.box(bw, bh, p.L * 0.12, '--c2');
-      const ar = { W: T.arrow('--c1'), N: T.arrow('--c2'), f: T.arrow('--c3'), F: T.arrow('--c4') };
-      const lab = { W: T.label('mg', '--c1'), N: T.label('N', '--c2'), f: T.label('f', '--c3'), F: T.label('F', '--c4') };
-      return { blk, ar, lab, bh, th };
+      const o3 = { r: p.L * 0.007, pad: p.L * 0.05 }, c3 = Object.assign({ line: false, opacity: 0.55, r: p.L * 0.005 }, o3);
+      const ar = { W: T.vec('--c1', 'mg', o3), N: T.vec('--c2', 'N', o3), f: T.vec('--c3', 'f', o3), F: T.vec('--c4', 'F', o3), Wp: T.vec('--c1', 'mg sin θ', c3), Wn: T.vec('--c1', 'mg cos θ', c3), v: T.vec('--c6', 'v', Object.assign({ kind: 'v' }, o3)), a: T.vec('--c5', 'a', Object.assign({ kind: 'v' }, o3)) };
+      return { blk, ar, bh, th };
     },
     update(ob, st, p) {
       const th = ob.th, c = Math.cos(th), s = Math.sin(th), cx = st.s * c - s * ob.bh / 2, cy = st.s * s + c * ob.bh / 2;
       ob.blk.position.set(cx, cy, 0); ob.blk.rotation.z = th;
       const r = st.r, k = p.L * 0.25 / Math.max(r.W, r.N, Math.abs(r.f), p.F, 1e-9), o = [cx, cy, p.L * 0.07];
-      const set = (n, vx, vy, mag) => { ob.ar[n].set(o, [vx * mag * k, vy * mag * k, 0]); ob.lab[n].visible = mag * k > 0.05; ob.lab[n].set(null, [cx + vx * mag * k * 1.12, cy + vy * mag * k * 1.12, p.L * 0.07]); };
-      set('W', 0, -1, r.W); set('N', -s, c, r.N); set('f', c, s, r.f); set('F', Math.cos(th + p.phi * RAD), Math.sin(th + p.phi * RAD), p.F);
+      const set = (n, vx, vy, mag, t) => mag * k > 1e-4 || mag * k < -1e-4 ? ob.ar[n].set(o, [vx * mag * k, vy * mag * k, 0], t + ' ' + fmt(Math.abs(mag)) + ' N') : ob.ar[n].hide();
+      set('W', 0, -1, r.W, 'mg'); set('N', -s, c, r.N, 'N'); set('f', c, s, r.f, 'f'); set('F', Math.cos(th + p.phi * RAD), Math.sin(th + p.phi * RAD), p.F, 'F');
+      if (p.comp) { set('Wp', -c, -s, r.W * s, 'mg sin θ'); set('Wn', s, -c, r.W * c, 'mg cos θ'); } else { ob.ar.Wp.hide(); ob.ar.Wn.hide(); }
+      const ov = [cx, cy + ob.bh * 1.2, -p.L * 0.07];
+      if (Math.abs(st.v) > 1e-3) ob.ar.v.set(ov, [c * st.v * p.L * 0.05, s * st.v * p.L * 0.05, 0], 'v ' + fmt(st.v) + ' m/s'); else ob.ar.v.hide();
+      if (Math.abs(st.a) > 1e-3) ob.ar.a.set([ov[0], ov[1] + ob.bh, ov[2]], [c * st.a * p.L * 0.03, s * st.a * p.L * 0.03, 0], 'a ' + fmt(st.a) + ' m/s²'); else ob.ar.a.hide();
     }
   },
   notes: ['เพิ่มมุมจนเกินมุมวิกฤต tan⁻¹μₛ กล่องจะเริ่มไถลเองแม้ไม่มีแรงดึง', 'ขณะกล่องนิ่ง แรงเสียดทานสถิตมีค่าเท่าที่จำเป็น (ไม่ใช่ μₛN เสมอ) ดูค่า f เทียบกับแรงเสียดทานสถิตสูงสุด', 'ดึงด้วยมุม φ บวก (เชิดขึ้นจากผิว) ทำให้ N ลดลง แรงเสียดทานจึงลดตาม', 'ลากกล่องเพื่อเปลี่ยนตำแหน่งเริ่ม ลากยอดพื้นเอียงเพื่อเปลี่ยนมุม']
@@ -2280,10 +2338,16 @@ CASES.push({
         if (sp.type === 'rope') return { kind: 'rope', x, l: T.line('--rope', { max: 2 }) };
         return { kind: sp.type, x, l: T.spring('--spring', { coils: 10, r: 0.1 }) };
       });
-      return { beam, parts };
+      const all = r.W.map(q => q.w).concat(r.S.map(q => Math.abs(q.F))), k = 1.3 / Math.max(1e-9, ...all), o3 = { r: 0.03, pad: 0.2 };
+      const wA = r.W.map(q => ({ q, a: T.vec('--c1', (q.beam ? 'W คาน ' : 'W ') + fmt(q.w) + ' N', o3) }));
+      const sA = r.S.map(q => ({ q, a: T.vec('--c3', fmt(q.F) + ' N', o3) }));
+      return { beam, parts, wA, sA, k, ok: r.ok };
     },
     update(ob, st, p) {
       const xc = p.L / 2; ob.beam.position.set(xc, st.y, 0); ob.beam.rotation.z = st.th;
+      const P = x => [xc + (x - xc) * Math.cos(st.th), st.y + (x - xc) * Math.sin(st.th), 0.32];
+      ob.wA.forEach(({ q, a }) => ob.ok ? a.set(P(q.x), [0, -q.w * ob.k, 0]) : a.hide());
+      ob.sA.forEach(({ q, a }) => ob.ok && q.on && Math.abs(q.F) > 1e-6 ? a.set(P(q.x), [0, q.F * ob.k, 0]) : a.hide());
       ob.parts.forEach(q => { if (!q) return; const y = st.y + (q.x - xc) * Math.sin(st.th), X = xc + (q.x - xc) * Math.cos(st.th); if (q.kind === 'rope') q.l.set([[q.x, 2.2, 0], [X, y + 0.06, 0]]); else if (q.kind === 'spring') q.l.set2([q.x, -1.2, 0], [X, y - 0.06, 0]); else q.l.set2([q.x, 2.2, 0], [X, y + 0.06, 0]); });
     }
   },
@@ -2442,8 +2506,10 @@ CASES.push({
       T.line('--rope', { pts: [[p.ax, 0, 0], K0] }); T.line('--rope', { pts: [[p.bx, 0, 0], K0] }); T.line('--rope', { pts: [K0, [kx, -p.ky - 0.6, 0]] });
       const b = T.box(0.6, 0.45, 0.6, '--c2'); b.position.set(kx, -p.ky - 0.82, 0);
       const k = 1.6 / Math.max(o.W, o.T1, o.T2), a1 = o.a1 * RAD, a2 = o.a2 * RAD;
-      T.arrow('--c3').set(K0, [-o.T1 * Math.cos(a1) * k, o.T1 * Math.sin(a1) * k, 0]); T.arrow('--c4').set(K0, [o.T2 * Math.cos(a2) * k, o.T2 * Math.sin(a2) * k, 0]);
-      T.label('T₁ ' + fmt(o.T1) + ' N', '--c3', { pos: [K0[0] - o.T1 * Math.cos(a1) * k, K0[1] + o.T1 * Math.sin(a1) * k + 0.2, 0] }); T.label('T₂ ' + fmt(o.T2) + ' N', '--c4', { pos: [K0[0] + o.T2 * Math.cos(a2) * k, K0[1] + o.T2 * Math.sin(a2) * k + 0.2, 0] });
+      const Kf = [K0[0], K0[1], 0.15];
+      T.vec('--c3', '', { r: 0.04 }).set(Kf, [-o.T1 * Math.cos(a1) * k, o.T1 * Math.sin(a1) * k, 0], 'T₁ ' + fmt(o.T1) + ' N');
+      T.vec('--c4', '', { r: 0.04 }).set(Kf, [o.T2 * Math.cos(a2) * k, o.T2 * Math.sin(a2) * k, 0], 'T₂ ' + fmt(o.T2) + ' N');
+      T.vec('--c1', '', { r: 0.04 }).set(Kf, [0, -o.W * k, 0], 'W ' + fmt(o.W) + ' N');
       return {};
     }
   },
@@ -2525,9 +2591,16 @@ CASES.push({
       const P3 = tr.pts.filter((_, i) => i % 3 === 0).map(q => [q[0], q[1], 0]); P3.push([tr.pts[tr.pts.length - 1][0], tr.pts[tr.pts.length - 1][1], 0]);
       [-0.35, 0.35].forEach(z => T.tube(P3.map(q => [q[0], q[1], z]), 0.06, '--ink'));
       for (let s = 0; s <= tr.L; s += 1.2) { const q = tr.at(s); if (q.y > 0.1) { const c = T.cyl(0.06, 0.06, q.y, '--muted'); c.position.set(q.x, q.y / 2, 0); } }
-      return { ball: T.sphere(0.3, '--c1'), lab: T.label('', '--ink') };
+      const o3 = { r: 0.05, pad: 0.3 };
+      return { ball: T.sphere(0.3, '--c1'), aW: T.vec('--c1', 'mg', o3), aN: T.vec('--c2', 'N', o3), aF: T.vec('--c3', 'f', o3), aV: T.vec('--c6', 'v', Object.assign({ kind: 'v' }, o3)) };
     },
-    update(ob, st, p, o) { const q = o._T.at(st.s); ob.ball.position.set(q.x - Math.sin(q.ang) * 0.36, q.y + Math.cos(q.ang) * 0.36, 0); ob.lab.set(fmt(Math.abs(st.v)) + ' m/s', [q.x, q.y + 1, 0]); }
+    update(ob, st, p, o) {
+      const q = o._T.at(st.s), c = Math.cos(q.ang), s = Math.sin(q.ang), P = [q.x - s * 0.36, q.y + c * 0.36, 0]; ob.ball.position.set(...P);
+      const W = p.m * p.g, k = 1.6 / W, N = p.m * (p.g * c + q.k * st.v * st.v), fr = p.mu * Math.abs(N), Pf = [P[0], P[1], 0.4];
+      ob.aW.set(Pf, [0, -W * k, 0], 'mg ' + fmt(W) + ' N'); ob.aN.set(Pf, [-s * N * k, c * N * k, 0], 'N ' + fmt(N) + ' N');
+      if (p.mu > 0 && Math.abs(st.v) > 0.02) ob.aF.set(Pf, [-sgn(st.v) * c * fr * k, -sgn(st.v) * s * fr * k, 0], 'f ' + fmt(fr) + ' N'); else ob.aF.hide();
+      if (Math.abs(st.v) > 0.05) ob.aV.set([P[0], P[1], -0.4], [c * st.v * 0.25, s * st.v * 0.25, 0], 'v ' + fmt(Math.abs(st.v)) + ' m/s'); else ob.aV.hide();
+    }
   },
   notes: ['ไม่มีแรงเสียดทาน ลูกบอลขึ้นได้สูงสุดเท่าระดับพลังงานเริ่มต้น (เส้นประ) ไม่ว่ารางจะคดเคี้ยวอย่างไร', 'อัตราเร็วที่ตำแหน่งใดขึ้นกับความสูงของตำแหน่งนั้นเท่านั้น v = √(2g(h₀ − h)) ไม่ขึ้นกับมวล', 'มีแรงเสียดทาน พลังงานกลค่อยๆ กลายเป็นความร้อน แต่พลังงานรวมยังคงที่', 'ลากจุดวงกลมเพื่อปั้นราง ลากจุดเหนือลูกบอลเพื่อเลือกจุดปล่อย']
 });
@@ -2752,9 +2825,15 @@ CASES.push({
   },
   plot: { overlay: true, yLabel: 'v (m/s)', series: [{ label: 'v₁', unit: 'm/s', c: '--c1', f: s => s.v1 }, { label: 'v₂', unit: 'm/s', c: '--c2', f: s => s.v2 }, { label: 'โมเมนตัมรวม', unit: 'kg·m/s', c: '--muted', f: (s, p) => p.m1 * s.v1 + p.m2 * s.v2 }] },
   three: {
-    cam() { return { pos: [-2, 3, 8], target: [0, 0.3, 0] }; },
-    build(T, p) { const tr = T.box(14, 0.1, 1.2, '--block', { receive: true }); tr.position.y = -0.05; const w1 = 0.5 + 0.25 * Math.cbrt(p.m1), w2 = 0.5 + 0.25 * Math.cbrt(p.m2); const a = T.box(w1, 0.42, 0.6, '--c1'), b = T.box(w2, 0.42, 0.6, '--c2'); return { a, b, la: T.label('', '--c1'), lb: T.label('', '--c2') }; },
-    update(ob, st) { ob.a.position.set(st.x1, 0.33, 0); ob.b.position.set(st.x2, 0.33, 0); ob.la.set(fmt(st.v1) + ' m/s', [st.x1, 0.9, 0]); ob.lb.set(fmt(st.v2) + ' m/s', [st.x2, 0.9, 0]); }
+    cam() { return { pos: [-1, 2.4, 6], target: [0, 0.3, 0] }; },
+    build(T, p) { const tr = T.box(14, 0.1, 1.2, '--block', { receive: true }); tr.position.y = -0.05; const w1 = 0.5 + 0.25 * Math.cbrt(p.m1), w2 = 0.5 + 0.25 * Math.cbrt(p.m2); const a = T.box(w1, 0.42, 0.6, '--c1'), b = T.box(w2, 0.42, 0.6, '--c2'); const o3 = { kind: 'v', r: 0.035, pad: 0.25 }, f3 = { r: 0.035, pad: 0.25 };
+      return { a, b, w1, w2, va: T.vec('--c1', 'v₁', o3), vb: T.vec('--c2', 'v₂', o3), fa: T.vec('--c4', 'F₂₁', f3), fb: T.vec('--c4', 'F₁₂', f3), kv: 1.4 / Math.max(0.5, Math.abs(p.u1), Math.abs(p.u2)) }; },
+    update(ob, st) {
+      ob.a.position.set(st.x1, 0.33, 0); ob.b.position.set(st.x2, 0.33, 0);
+      ob.va.set([st.x1, 0.75, 0], [st.v1 * ob.kv, 0, 0], 'v₁ ' + fmt(st.v1) + ' m/s'); ob.vb.set([st.x2, 0.75, 0], [st.v2 * ob.kv, 0, 0], 'v₂ ' + fmt(st.v2) + ' m/s');
+      // แรงคู่กิริยา-ปฏิกิริยาขณะชน (ขนาดเท่ากัน ทิศตรงข้าม)
+      if (st.hit && st.t - st.th < 0.35) { const xc = (st.x1 + st.x2) / 2; ob.fa.set([xc - 0.02, 0.33, 0.42], [-0.9, 0, 0], 'F₂₁ (รถ 2 ดันรถ 1)'); ob.fb.set([xc + 0.02, 0.33, 0.42], [0.9, 0, 0], 'F₁₂'); } else { ob.fa.hide(); ob.fb.hide(); }
+    }
   },
   notes: ['โมเมนตัมรวมคงที่ทุกค่า e แต่พลังงานจลน์คงที่เฉพาะ e = 1', 'มวลเท่ากัน ชนแบบยืดหยุ่น ความเร็วแลกกัน', 'วัตถุเบาชนวัตถุหนักที่อยู่นิ่ง จะกระดอนกลับเกือบความเร็วเดิม', 'e = 0 เสียพลังงานจลน์มากที่สุด (แต่ไม่จำเป็นต้องเสียทั้งหมด เพราะโมเมนตัมต้องคงที่)']
 });
@@ -2808,8 +2887,9 @@ CASES.push({
   handles(p, o) { const R = o._c.r1 + o._c.r2; return [{ id: 'b', x: -3.2, y: o._c.by, set: (x, y) => ({ b: clamp(y / R, -0.98, 0.98) }) }]; },
   three: {
     cam() { return { pos: [0.5, 6, 6], target: [1, 0, 0] }; },
-    build(T, p, o) { const t = T.box(10.5, 0.15, 6, '--block', { receive: true }); t.position.set(1.1, -0.075, 0); const c = o._c; const a = T.cyl(c.r1, c.r1, 0.12, '--c1'), b = T.cyl(c.r2, c.r2, 0.12, '--c2'); return { a, b, ta: T.trail('--c1'), tb: T.trail('--c2') }; },
-    update(ob, st) { ob.a.position.set(st.p1[0], 0.06, -st.p1[1]); ob.b.position.set(st.p2[0], 0.06, -st.p2[1]); if (st.t === 0) { ob.ta.clear(); ob.tb.clear(); } ob.ta.push([st.p1[0], 0.01, -st.p1[1]]); ob.tb.push([st.p2[0], 0.01, -st.p2[1]]); }
+    build(T, p, o) { const t = T.box(10.5, 0.15, 6, '--block', { receive: true }); t.position.set(1.1, -0.075, 0); const c = o._c; const a = T.cyl(c.r1, c.r1, 0.12, '--c1'), b = T.cyl(c.r2, c.r2, 0.12, '--c2'); const o3 = { kind: 'v', r: 0.035, pad: 0.25 }; return { a, b, ta: T.trail('--c1'), tb: T.trail('--c2'), va: T.vec('--c1', 'v₁', o3), vb: T.vec('--c2', 'v₂', o3) }; },
+    update(ob, st) {
+      [[ob.va, st.p1, st.v1, 'v₁'], [ob.vb, st.p2, st.v2, 'v₂']].forEach(([a, q, v, n]) => { const s = Math.hypot(...v); if (s > 0.01) a.set([q[0], 0.2, -q[1]], [v[0] * 0.5, 0, -v[1] * 0.5], n + ' ' + fmt(s) + ' m/s'); else a.hide(); }); ob.a.position.set(st.p1[0], 0.06, -st.p1[1]); ob.b.position.set(st.p2[0], 0.06, -st.p2[1]); if (st.t === 0) { ob.ta.clear(); ob.tb.clear(); } ob.ta.push([st.p1[0], 0.01, -st.p1[1]]); ob.tb.push([st.p2[0], 0.01, -st.p2[1]]); }
   },
   notes: ['b = 0 คือการชนตรงศูนย์ กลายเป็นการชน 1 มิติ', 'มวลเท่ากันและยืดหยุ่นสมบูรณ์ ทั้งสองแยกกันเป็นมุม 90° เสมอ (ยกเว้นชนตรงศูนย์)', 'ผลรวมเวกเตอร์ p₁′ + p₂′ (เส้นประ) เท่ากับ p ก่อนชนพอดี', 'ลากพัค 1 ขึ้นลงเพื่อเปลี่ยนระยะเยื้องศูนย์']
 });
@@ -2888,8 +2968,12 @@ CASES.push({
   },
   three: {
     cam(p) { return { pos: [2.5, 0, 3.5], target: [0, -p.L * 0.7, 0] }; },
-    build(T, p) { const top = T.box(1.6, 0.06, 0.4, '--ink'); const rope = T.line('--rope', { max: 2 }), rope2 = T.line('--rope', { max: 2 }); const blk = T.box(0.4, 0.26, 0.3, '--block2'); const bul = T.cyl(0.02, 0.02, 0.1, '--c1'); bul.rotation.z = Math.PI / 2; return { rope, rope2, blk, bul }; },
-    update(ob, st, p) { const bx = p.L * Math.sin(st.th), by = -p.L * Math.cos(st.th); ob.rope.set([[-0.15, 0, 0], [bx - 0.15, by, 0]]); ob.rope2.set([[0.15, 0, 0], [bx + 0.15, by, 0]]); ob.blk.position.set(bx, by - 0.13, 0); ob.blk.rotation.z = st.th; ob.bul.visible = !st.hit; ob.bul.position.set(st.bx, -p.L - 0.12, 0); }
+    build(T, p) { const top = T.box(1.6, 0.06, 0.4, '--ink'); const rope = T.line('--rope', { max: 2 }), rope2 = T.line('--rope', { max: 2 }); const blk = T.box(0.4, 0.26, 0.3, '--block2'); const bul = T.cyl(0.02, 0.02, 0.1, '--c1'); bul.rotation.z = Math.PI / 2; const o3 = { r: 0.015, pad: 0.1 };
+      return { rope, rope2, blk, bul, aT: T.vec('--c3', 'T', o3), aW: T.vec('--c1', '(m+M)g', o3), aV: T.vec('--c2', 'V', Object.assign({ kind: 'v' }, o3)), aB: T.vec('--c1', 'v กระสุน', Object.assign({ kind: 'v' }, o3)) }; },
+    update(ob, st, p, o) {
+      { const M = p.m / 1000 + p.M, W = M * 9.8, k = 0.45 / W, bx = p.L * Math.sin(st.th), by = -p.L * Math.cos(st.th) - 0.13, s = Math.sin(st.th), c = Math.cos(st.th), Pz = [bx, by, 0.2];
+        if (st.hit) { const Tn = M * (9.8 * c + p.L * st.w * st.w); ob.aT.set(Pz, [-s * Tn * k, c * Tn * k, 0], 'T ' + fmt(Tn) + ' N'); ob.aW.set(Pz, [0, -W * k, 0], '(m+M)g ' + fmt(W) + ' N'); const V = p.L * st.w; if (Math.abs(V) > 0.01) ob.aV.set(Pz, [c * V * 0.4, s * V * 0.4, 0], 'V ' + fmt(Math.abs(V)) + ' m/s'); else ob.aV.hide(); ob.aB.hide(); }
+        else { ob.aT.set(Pz, [0, 0.45, 0], 'T = Mg'); ob.aW.set(Pz, [0, -0.45 * p.M / M, 0], 'Mg'); ob.aV.hide(); ob.aB.set([st.bx, -p.L - 0.12, 0], [0.5, 0, 0], 'v ' + fmt(p.v) + ' m/s'); } } const bx = p.L * Math.sin(st.th), by = -p.L * Math.cos(st.th); ob.rope.set([[-0.15, 0, 0], [bx - 0.15, by, 0]]); ob.rope2.set([[0.15, 0, 0], [bx + 0.15, by, 0]]); ob.blk.position.set(bx, by - 0.13, 0); ob.blk.rotation.z = st.th; ob.bul.visible = !st.hit; ob.bul.position.set(st.bx, -p.L - 0.12, 0); }
   },
   notes: ['ช่วงชนเป็นการชนไม่ยืดหยุ่น พลังงานจลน์ส่วนใหญ่กลายเป็นความร้อนและเสียง ห้ามใช้อนุรักษ์พลังงานข้ามช่วงชน', 'ไม้หนักขึ้น ความเร็วหลังชนลดลง ไม้จึงขึ้นได้ต่ำลง', 'ความยาวเชือกไม่มีผลต่อความสูงที่ขึ้นได้ แต่มีผลต่อมุม']
 });
@@ -3003,9 +3087,17 @@ CASES.push({
       const ball = T.sphere(Math.max(0.25, X * 0.008), '--c1'), tr = T.trail('--c1', 4000);
       ghosts.forEach(gh => T.line('--muted', { pts: gh.map(q => [q[0], q[1], 0]), max: gh.length, opacity: 0.5 }));
       const can = T.cyl(X * 0.006, X * 0.008, X * 0.05, '--ink'); can.position.set(0, p.h0, 0); can.rotation.z = p.th * RAD - Math.PI / 2;
-      return { ball, tr, lab: T.label('', '--ink'), X };
+      const o3 = { kind: 'v', r: X * 0.0025, pad: X * 0.025 }, c3 = Object.assign({}, o3, { opacity: 0.6, r: X * 0.0018 }), f3 = { r: X * 0.0025, pad: X * 0.025 };
+      return { ball, tr, X, kv: X * 0.2 / Math.max(1, p.v0), aV: T.vec('--c1', 'v', o3), aX: T.vec('--c2', 'vₓ', c3), aY: T.vec('--c3', 'v_y', c3), aW: T.vec('--c5', 'mg', f3), aD: T.vec('--c4', 'แรงต้านอากาศ', f3) };
     },
-    update(ob, st) { ob.ball.position.set(st.x, st.y, 0); if (st.t === 0) ob.tr.clear(); ob.tr.push([st.x, st.y, 0]); ob.lab.set('v = ' + fmt(Math.hypot(st.vx, st.vy)) + ' m/s', [st.x, st.y + ob.X * 0.04, 0]); }
+    update(ob, st, p) {
+      const P = [st.x, st.y, 0]; ob.ball.position.set(...P); if (st.t === 0) ob.tr.clear(); ob.tr.push(P.slice());
+      const v = Math.hypot(st.vx, st.vy), k = ob.kv, kf = ob.X * 0.09 / p.g, Pv = [st.x, st.y, ob.X * 0.01];
+      if (v > 1e-3 && !st.done) { ob.aV.set(Pv, [st.vx * k, st.vy * k, 0], 'v ' + fmt(v) + ' m/s'); } else ob.aV.hide();
+      if (p.comp && !st.done) { ob.aX.set(Pv, [st.vx * k, 0, 0], 'vₓ ' + fmt(st.vx)); Math.abs(st.vy) > 1e-3 ? ob.aY.set(Pv, [0, st.vy * k, 0], 'v_y ' + fmt(st.vy)) : ob.aY.hide(); } else { ob.aX.hide(); ob.aY.hide(); }
+      if (!st.done) ob.aW.set([st.x, st.y, -ob.X * 0.01], [0, -p.g * kf, 0], 'mg'); else ob.aW.hide();
+      if (p.drag && !st.done && v > 1e-3) { const d = p.kd * v * v; ob.aD.set([st.x, st.y, -ob.X * 0.01], [-st.vx / v * d * kf, -st.vy / v * d * kf, 0], 'แรงต้าน'); } else ob.aD.hide();
+    }
   },
   notes: ['vₓ (ลูกศรน้ำเงิน) คงที่ตลอดเมื่อไม่มีแรงต้าน มีเพียง v_y ที่เปลี่ยน', 'บนพื้นราบ มุมที่รวมกันได้ 90° (เช่น 30° กับ 60°) ตกไกลเท่ากัน', 'ยิงจากที่สูง มุมที่ไปไกลสุดน้อยกว่า 45°', 'เปิดแรงต้านอากาศ ทางเดินไม่สมมาตรอีกต่อไป ขาลงชันกว่าขาขึ้น', 'ลากปลายลำกล้องเพื่อเล็ง (ระยะลากกำหนดความเร็ว) ลากธงเพื่อย้ายเป้า']
 });
@@ -3113,8 +3205,8 @@ CASES.push({
   },
   three: {
     cam(p) { const R = p.u * p.u / p.g; return { pos: [R * 0.2, R * 0.45, R * 1.0], target: [R * 0.5, R * 0.15, 0] }; },
-    build(T, p) { const R = p.u * p.u / p.g; T.floor(R * 2.4, { step: K.niceStep(R / 6) }); const A = []; for (let a = p.step; a < 90; a += p.step) A.push(a); const cols = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6']; return { A, balls: A.map((a, i) => T.sphere(R * 0.012, cols[i % 6])), trs: A.map((a, i) => T.trail(cols[i % 6])) }; },
-    update(ob, st, p) { ob.A.forEach((a, i) => { const th = a * RAD, T = 2 * p.u * Math.sin(th) / p.g, t = Math.min(st.t, T), x = p.u * Math.cos(th) * t, y = p.u * Math.sin(th) * t - 0.5 * p.g * t * t; ob.balls[i].position.set(x, y, (i - ob.A.length / 2) * 0.02 * p.u); if (st.t === 0) ob.trs[i].clear(); ob.trs[i].push([x, y, (i - ob.A.length / 2) * 0.02 * p.u]); }); }
+    build(T, p) { const R = p.u * p.u / p.g; T.floor(R * 2.4, { step: K.niceStep(R / 6) }); const A = []; for (let a = p.step; a < 90; a += p.step) A.push(a); const cols = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6']; const o3 = { kind: 'v', r: R * 0.002, pad: R * 0.02 }; return { A, R, balls: A.map((a, i) => T.sphere(R * 0.012, cols[i % 6])), trs: A.map((a, i) => T.trail(cols[i % 6])), vs: A.map((a, i) => T.vec(cols[i % 6], a + '°', o3)) }; },
+    update(ob, st, p) { ob.A.forEach((a, i) => { { const th = a * RAD, T = 2 * p.u * Math.sin(th) / p.g, t = Math.min(st.t, T), x = p.u * Math.cos(th) * t, y = p.u * Math.sin(th) * t - 0.5 * p.g * t * t, k = ob.R * 0.12 / p.u; if (t < T) ob.vs[i].set([x, y, (i - ob.A.length / 2) * 0.02 * p.u], [p.u * Math.cos(th) * k, (p.u * Math.sin(th) - p.g * t) * k, 0], a + '°'); else ob.vs[i].hide(); } const th = a * RAD, T = 2 * p.u * Math.sin(th) / p.g, t = Math.min(st.t, T), x = p.u * Math.cos(th) * t, y = p.u * Math.sin(th) * t - 0.5 * p.g * t * t; ob.balls[i].position.set(x, y, (i - ob.A.length / 2) * 0.02 * p.u); if (st.t === 0) ob.trs[i].clear(); ob.trs[i].push([x, y, (i - ob.A.length / 2) * 0.02 * p.u]); }); }
   },
   notes: ['ลูกที่มุม 45° ตกไกลที่สุด', 'มุม 30° กับ 60° (หรือ 15° กับ 75°) ตกที่เดียวกัน แต่มุมสูงลอยนานกว่า', 'ทุกลูกที่ยิงด้วยอัตราเร็วเท่ากัน ตกถึงพื้นด้วยอัตราเร็วเท่ากัน']
 });
@@ -3174,13 +3266,12 @@ CASES.push({
       T.floor(p.L * 4, { y: -p.L * 1.3, step: 0.25 });
       const circ = []; for (let i = 0; i <= 64; i++) { const a = i / 64 * 2 * Math.PI; circ.push([o.r * Math.cos(a), -h, o.r * Math.sin(a)]); } T.line('--muted', { pts: circ, max: 65 });
       const cone = T.mesh(new T.THREE.ConeGeometry(o.r, h, 48, 1, true), '--water', { opacity: 0.12, side: T.THREE.DoubleSide, cast: false }); cone.position.y = -h / 2; cone.rotation.x = Math.PI;
-      return { rope: T.line('--rope', { max: 2 }), bob: T.sphere(0.06 * p.L + 0.02, '--c1'), aT: T.arrow('--c3', { r: 0.012 }), aW: T.arrow('--c1', { r: 0.012 }), aC: T.arrow('--c4', { r: 0.012 }), aV: T.arrow('--c2', { r: 0.012 }), lT: T.label('T', '--c3'), lW: T.label('mg', '--c1'), lC: T.label('ΣF สู่ศูนย์กลาง', '--c4'), h };
+      return { rope: T.line('--rope', { max: 2 }), bob: T.sphere(0.06 * p.L + 0.02, '--c1'), aT: T.vec('--c3', 'T', { r: 0.012, pad: 0.08 }), aW: T.vec('--c1', 'mg', { r: 0.012, pad: 0.08 }), aC: T.vec('--c4', 'ΣF', { r: 0.012, pad: 0.08 }), aV: T.vec('--c2', 'v', { kind: 'v', r: 0.012, pad: 0.08 }), h };
     },
     update(ob, st, p, o) {
       const x = o.r * Math.cos(st.ph), z = o.r * Math.sin(st.ph), P = [x, -ob.h, z], k = p.L * 0.45 / o.T;
       ob.rope.set([[0, 0, 0], P]); ob.bob.position.set(...P);
-      ob.aT.set(P, [-x / p.L * o.T * k, ob.h / p.L * o.T * k, -z / p.L * o.T * k]); ob.aW.set(P, [0, -p.m * p.g * k, 0]); ob.aC.set(P, [-x / o.r * o.Fc * k, 0, -z / o.r * o.Fc * k]); ob.aV.set(P, [-z / o.r * p.L * 0.3, 0, x / o.r * p.L * 0.3]);
-      ob.lT.set(null, [P[0] - x / p.L * o.T * k, P[1] + ob.h / p.L * o.T * k, P[2] - z / p.L * o.T * k]); ob.lW.set(null, [P[0], P[1] - p.m * p.g * k - 0.05, P[2]]); ob.lC.set(null, [P[0] - x / o.r * o.Fc * k * 1.1, P[1] - 0.05, P[2] - z / o.r * o.Fc * k * 1.1]);
+      ob.aT.set(P, [-x / p.L * o.T * k, ob.h / p.L * o.T * k, -z / p.L * o.T * k], 'T ' + fmt(o.T) + ' N'); ob.aW.set(P, [0, -p.m * p.g * k, 0], 'mg ' + fmt(p.m * p.g) + ' N'); ob.aC.set(P, [-x / o.r * o.Fc * k, 0, -z / o.r * o.Fc * k], 'ΣF ' + fmt(o.Fc) + ' N'); ob.aV.set(P, [-z / o.r * p.L * 0.3, 0, x / o.r * p.L * 0.3], 'v ' + fmt(o.v) + ' m/s');
     }
   },
   notes: ['มุมกว้างขึ้น ต้องหมุนเร็วขึ้น และแรงตึงเพิ่มขึ้นมาก (T = mg/cos θ)', 'คาบขึ้นกับความสูงของกรวย L cos θ ไม่ขึ้นกับมวล', 'แรงลัพธ์ (ΣF) ชี้เข้าหาศูนย์กลางวงกลมแนวระดับเสมอ ไม่ใช่ชี้ไปที่จุดแขวน', 'หมุนมุมกล้องในมุมมอง 3D เพื่อดูรูปกรวย']
@@ -3290,9 +3381,16 @@ CASES.push({
       geo.setAttribute('position', new T.THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
       T.mesh(geo, '--ground', { side: T.THREE.DoubleSide, receive: true, cast: false });
       T.floor(p.r * 3, { y: -w * 0.6, step: K.niceStep(p.r / 4) });
-      const car = K.car3d(T, '--c1', Math.max(6, p.r * 0.11)); return { car, th, w, lab: T.label('', '--ink') };
+      const cs = Math.max(6, p.r * 0.11), car = K.car3d(T, '--c1', cs), o3 = { r: cs * 0.03, pad: cs * 0.25 };
+      return { car, th, w, cs, lab: T.label('', '--ink'), aW: T.vec('--c1', 'mg', o3), aN: T.vec('--c2', 'N', o3), aF: T.vec('--c3', 'f', o3), aS: T.vec('--c4', 'ΣF', o3), aV: T.vec('--c6', 'v', Object.assign({ kind: 'v' }, o3)) };
     },
-    update(ob, st, p, o) { const a = st.ang, d = clamp(st.drift, -1.2, 1.2) * ob.w * 0.4, rr = p.r + d * Math.cos(ob.th), y = d * Math.sin(ob.th); ob.car.position.set(rr * Math.cos(a), y + 0.1, -rr * Math.sin(a)); ob.car.rotation.set(0, a + Math.PI, 0); ob.car.rotateX(-ob.th * 0); ob.car.rotateZ(0); ob.car.children.forEach(() => {}); ob.lab.set(fmt(p.v) + ' km/h', [rr * Math.cos(a), y + ob.w * 0.5, -rr * Math.sin(a)]); }
+    update(ob, st, p, o) { const a = st.ang, d = clamp(st.drift, -1.2, 1.2) * ob.w * 0.4, rr = p.r + d * Math.cos(ob.th), y = d * Math.sin(ob.th); ob.car.position.set(rr * Math.cos(a), y + 0.1, -rr * Math.sin(a)); ob.car.rotation.set(0, a + Math.PI, 0); ob.car.rotateX(-ob.th * 0); ob.car.rotateZ(0); ob.car.children.forEach(() => {}); ob.lab.set(fmt(p.v) + ' km/h', [(rr + ob.cs * 1.6) * Math.cos(a), y, -(rr + ob.cs * 1.6) * Math.sin(a)]);
+      const b = o._b, k = ob.cs * 2 / (p.m * 9.8), c = Math.cos(ob.th), s = Math.sin(ob.th), ix = -Math.cos(a), iz = Math.sin(a), P = [rr * Math.cos(a), y + ob.cs * 0.35, -rr * Math.sin(a)];
+      const Fc = p.m * b.v * b.v / p.r;
+      ob.aW.set(P, [0, -p.m * 9.8 * k, 0], 'mg'); ob.aN.set(P, [ix * s * b.N * k, c * b.N * k, iz * s * b.N * k], 'N ' + fmt(b.N) + ' N');
+      if (Math.abs(b.f) > 1) ob.aF.set(P, [ix * c * b.f * k, -s * b.f * k, iz * c * b.f * k], 'f ' + fmt(Math.abs(b.f)) + ' N'); else ob.aF.hide();
+      ob.aS.set(P, [ix * Fc * k, 0, iz * Fc * k], 'ΣF = mv²/r'); ob.aV.set(P, [-Math.sin(a) * ob.cs * 1.6, 0, -Math.cos(a) * ob.cs * 1.6], 'v');
+    }
   },
   notes: ['ความเร็วพอดี (v₀) แรงเสียดทานเป็นศูนย์ แรงปฏิกิริยาตั้งฉากแนวระดับทำหน้าที่เป็นแรงสู่ศูนย์กลาง', 'เร็วกว่า v₀ แรงเสียดทานต้องชี้ลงตามพื้นเอียง ช้ากว่า v₀ ต้องชี้ขึ้น', 'ถนนเอียงมากขึ้น ความเร็วที่ปลอดภัยสูงขึ้น', 'ดูมุมมอง 3D เพื่อเห็นรถวิ่งรอบสนาม']
 });
@@ -3339,9 +3437,14 @@ CASES.push({
   },
   live: [{ name: 'ระยะจากศูนย์กลาง', unit: 'km', f: s => Math.hypot(s.x, s.y) / 1000 }, { name: 'อัตราเร็ว', unit: 'km/s', f: s => Math.hypot(s.vx, s.vy) / 1000 }],
   three: {
-    cam(p, o) { const R = isFinite(o._a) ? Math.max(o._r, 2 * o._a - o._r) : o._r * 2; const s = 1e-6; return { pos: [0, R * s * 1.2, R * s * 2.2], target: [0, 0, 0] }; },
-    build(T, p, o) { const s = 1e-6; const pl = T.sphere(o._R * s, '--c2'); pl.castShadow = false; const ring = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * 2 * Math.PI; ring.push([o._r * s * Math.cos(a), 0, -o._r * s * Math.sin(a)]); } T.line('--line', { pts: ring, max: 97 }); return { sat: T.sphere(o._R * s * 0.06, '--c1'), tr: T.trail('--c1', 3000), s }; },
-    update(ob, st) { ob.sat.position.set(st.x * ob.s, 0, -st.y * ob.s); if (st.t === 0) ob.tr.clear(); ob.tr.push([st.x * ob.s, 0, -st.y * ob.s]); }
+    cam(p, o) { const R = isFinite(o._a) ? Math.max(o._r, 2 * o._a - o._r) : o._r * 2; const s = 1e-6; return { pos: [0, R * s * 2.4, R * s * 1.1], target: [0, 0, 0] }; },
+    build(T, p, o) { const s = 1e-6; const pl = T.sphere(o._R * s, '--c2'); pl.castShadow = false; const ring = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * 2 * Math.PI; ring.push([o._r * s * Math.cos(a), 0, -o._r * s * Math.sin(a)]); } T.line('--line', { pts: ring, max: 97 }); const o3 = { r: o._R * s * 0.018, pad: o._R * s * 0.2 }; return { sat: T.sphere(o._R * s * 0.06, '--c1'), tr: T.trail('--c1', 3000), s, aV: T.vec('--c3', 'v', Object.assign({ kind: 'v' }, o3)), aF: T.vec('--c4', 'F_G', Object.assign({ ext: 0 }, o3)) }; },
+    update(ob, st, p, o) {
+      const P = [st.x * ob.s, 0, -st.y * ob.s]; ob.sat.position.set(...P); if (st.t === 0) ob.tr.clear(); ob.tr.push(P);
+      const r = Math.hypot(st.x, st.y), v = Math.hypot(st.vx, st.vy), L = o._r * ob.s * 0.45;
+      ob.aV.set(P, [st.vx / o._v * L, 0, -st.vy / o._v * L], 'v ' + fmt(v / 1000) + ' km/s');
+      const fl = L * 0.35 * Math.min(3, (o._r / r) ** 2); ob.aF.set(P, [-st.x / r * fl, 0, st.y / r * fl], 'F_G');
+    }
   },
   notes: ['ความเร็วพอดีกับ √(GM/r) ได้วงกลม มากกว่าได้วงรีที่จุดยิงเป็นจุดใกล้สุด น้อยกว่าได้วงรีที่จุดยิงเป็นจุดไกลสุด', 'ดาวเทียมเคลื่อนที่เร็วเมื่ออยู่ใกล้และช้าเมื่ออยู่ไกล (กฎข้อ 2 ของเคปเลอร์)', 'ความเร็ววงโคจรวงกลมไม่ขึ้นกับมวลดาวเทียม', 'ภาพเร่งเวลาให้ 1 รอบใช้ประมาณ 8 วินาที']
 });
@@ -3380,8 +3483,11 @@ CASES.push({
   handles(p) { return [{ id: 'r', x: p.r / 100, y: 0, set: (x, y) => ({ r: clamp(Math.hypot(x, y) * 100, 1, 15) }) }]; },
   three: {
     cam() { return { pos: [0, 0.35, 0.45], target: [0, 0, 0] }; },
-    build(T) { const d = T.cyl(0.17, 0.17, 0.012, '--block', { receive: true }); d.position.y = -0.006; const sp = T.box(0.17, 0.002, 0.01, '--c4'); sp.position.y = 0.001; const c = T.cyl(0.012, 0.012, 0.004, '--c5'); return { d, sp, c }; },
-    update(ob, st) { ob.d.rotation.y = -st.ang; ob.sp.rotation.y = -st.ang; ob.sp.position.set(0.085 * Math.cos(st.ang), 0.001, -0.085 * Math.sin(st.ang)); ob.c.position.set(st.x, 0.004, -st.y); }
+    build(T) { const d = T.cyl(0.17, 0.17, 0.012, '--block', { receive: true }); d.position.y = -0.006; const sp = T.box(0.17, 0.002, 0.01, '--c4'); sp.position.y = 0.001; const c = T.cyl(0.012, 0.012, 0.004, '--c5'), o3 = { r: 0.0035, pad: 0.018 }; return { d, sp, c, aF: T.vec('--c3', 'fₛ', o3), aV: T.vec('--c2', 'v', Object.assign({ kind: 'v' }, o3)) }; },
+    update(ob, st, p, o) {
+      const P = [st.x, 0.012, -st.y], r = Math.hypot(st.x, st.y) || 1;
+      if (!st.slip) { ob.aF.set(P, [-st.x / r * 0.07, 0, st.y / r * 0.07], 'fₛ = mω²r'); ob.aV.set(P, [-st.y / r * 0.08, 0, -st.x / r * 0.08], 'v'); }
+      else { ob.aF.hide(); const vv = Math.hypot(st.vx, st.vy) || 1; ob.aV.set(P, [st.vx / vv * 0.08, 0, -st.vy / vv * 0.08], 'v'); } ob.d.rotation.y = -st.ang; ob.sp.rotation.y = -st.ang; ob.sp.position.set(0.085 * Math.cos(st.ang), 0.001, -0.085 * Math.sin(st.ang)); ob.c.position.set(st.x, 0.004, -st.y); }
   },
   notes: ['ระยะจากแกนมากขึ้น ต้องการแรงสู่ศูนย์กลางมากขึ้น (mω²r) จึงไถลง่ายกว่า', 'เหรียญที่ไถลออกไปในแนวเส้นสัมผัส ไม่ได้พุ่งออกตามแนวรัศมี', 'ลากเหรียญเพื่อเปลี่ยนระยะจากแกน']
 });
@@ -3449,11 +3555,22 @@ CASES.push({
       const s = 0.12 + 0.06 * Math.cbrt(p.m);
       if (p.ori === 'h') { T.floor(3, { step: 0.1 }); const w = T.box(0.05, 0.4, 0.4, '--ground'); w.position.set(-0.92, 0.2, 0); }
       else { const c = T.box(0.8, 0.04, 0.4, '--ink'); c.position.y = 0.02; }
-      return { spr: T.spring('--spring', { coils: 14, r: 0.035 }), box: T.box(s, s, s, '--c2'), s };
+      const o3 = { r: 0.008, pad: 0.05 }, v3 = Object.assign({ kind: 'v' }, o3);
+      return { spr: T.spring('--spring', { coils: 14, r: 0.035 }), box: T.box(s, s, s, '--c2'), s, aS: T.vec('--c4', 'แรงสปริง', o3), aW: T.vec('--c1', 'mg', o3), aV: T.vec('--c1', 'v', v3), aA: T.vec('--c3', 'a', v3) };
     },
     update(ob, st, p, o) {
-      if (p.ori === 'h') { ob.box.position.set(st.x, ob.s / 2, 0); ob.spr.set2([-0.9, ob.s / 2, 0], [st.x - ob.s / 2, ob.s / 2, 0]); }
-      else { const yeq = -0.35 - o.xeq * 0.6 - 0.15, y = yeq - st.x * 0.6; ob.box.position.set(0, y, 0); ob.spr.set2([0, 0, 0], [0, y + ob.s / 2, 0]); }
+      const Amp = Math.max(o.Amp, 0.05), kf = 0.3 / Math.max(p.k * (Amp + (p.ori === 'h' ? 0 : o.xeq)), p.m * p.g, 1e-9), kv = 0.25 / Math.max(1e-6, Amp * o.w), ka = 0.2 / Math.max(1e-6, Amp * o.w * o.w);
+      if (p.ori === 'h') {
+        const P = [st.x, ob.s / 2, ob.s / 2 + 0.01]; ob.box.position.set(st.x, ob.s / 2, 0); ob.spr.set2([-0.9, ob.s / 2, 0], [st.x - ob.s / 2, ob.s / 2, 0]);
+        const F = -p.k * st.x; Math.abs(F) > 1e-6 ? ob.aS.set(P, [F * kf, 0, 0], 'F = −kx = ' + fmt(F) + ' N') : ob.aS.hide(); ob.aW.hide();
+        Math.abs(st.v) > 1e-3 ? ob.aV.set([st.x, ob.s + 0.06, 0], [st.v * kv, 0, 0], 'v ' + fmt(st.v) + ' m/s') : ob.aV.hide();
+        Math.abs(st.a) > 1e-3 ? ob.aA.set([st.x, ob.s + 0.16, 0], [st.a * ka, 0, 0], 'a ' + fmt(st.a) + ' m/s²') : ob.aA.hide();
+      } else {
+        const yeq = -0.35 - o.xeq * 0.6 - 0.15, y = yeq - st.x * 0.6, P = [0, y, ob.s / 2 + 0.01]; ob.box.position.set(0, y, 0); ob.spr.set2([0, 0, 0], [0, y + ob.s / 2, 0]);
+        const Fs = p.k * (o.xeq + st.x); ob.aS.set(P, [0, Fs * kf, 0], 'แรงสปริง ' + fmt(Fs) + ' N'); ob.aW.set(P, [0, -p.m * p.g * kf, 0], 'mg ' + fmt(p.m * p.g) + ' N');
+        Math.abs(st.v) > 1e-3 ? ob.aV.set([ob.s * 0.9, y, 0], [0, -st.v * kv, 0], 'v') : ob.aV.hide();
+        Math.abs(st.a) > 1e-3 ? ob.aA.set([-ob.s * 0.9, y, 0], [0, -st.a * ka, 0], 'a') : ob.aA.hide();
+      }
     }
   },
   notes: ['x กับ a มีทิศตรงข้ามเสมอ ความเร่งมากที่สุดที่ปลายสุด และเป็นศูนย์ที่จุดสมดุล', 'อัตราเร็วมากที่สุดที่จุดสมดุล เป็นศูนย์ที่ปลายสุด', 'คาบไม่ขึ้นกับแอมพลิจูด (ลองดึงมากน้อยต่างกัน)', 'สปริงแนวดิ่งมีคาบเท่าแนวระดับ แรงโน้มถ่วงเพียงเลื่อนจุดสมดุลลง', 'ลากกล่องเพื่อกำหนดระยะดึงเริ่มต้น']
@@ -3498,8 +3615,14 @@ CASES.push({
   live: [{ name: 'θ', unit: '°', f: s => s.th * DEG }, { name: 'v', unit: 'm/s', f: (s, p) => s.w * p.L }],
   three: {
     cam(p) { return { pos: [p.L * 0.8, -p.L * 0.2, p.L * 2.2], target: [0, -p.L * 0.6, 0] }; },
-    build(T, p) { const c = T.box(p.L * 0.6, 0.03, 0.3, '--ink'); c.position.y = 0.015; T.floor(p.L * 4, { y: -p.L * 1.25, step: 0.25 }); return { rope: T.line('--rope', { max: 2 }), bob: T.sphere(0.05 * p.L + 0.02, '--c1'), tr: T.trail('--c1', 600) }; },
-    update(ob, st, p) { const x = p.L * Math.sin(st.th), y = -p.L * Math.cos(st.th); ob.rope.set([[0, 0, 0], [x, y, 0]]); ob.bob.position.set(x, y, 0); ob.tr.push([x, y, 0]); }
+    build(T, p) { const c = T.box(p.L * 0.6, 0.03, 0.3, '--ink'); c.position.y = 0.015; T.floor(p.L * 4, { y: -p.L * 1.25, step: 0.25 }); const o3 = { r: 0.006 * p.L + 0.002, pad: 0.06 * p.L }; return { rope: T.line('--rope', { max: 2 }), bob: T.sphere(0.05 * p.L + 0.02, '--c1'), tr: T.trail('--c1', 600), aT: T.vec('--c4', 'T', o3), aW: T.vec('--c1', 'mg', o3), aR: T.vec('--c3', 'mg sin θ', Object.assign({ line: false, opacity: 0.6 }, o3)), aV: T.vec('--c2', 'v', Object.assign({ kind: 'v' }, o3)) }; },
+    update(ob, st, p, o) {
+      const s = Math.sin(st.th), c = Math.cos(st.th), x = p.L * s, y = -p.L * c; ob.rope.set([[0, 0, 0], [x, y, 0]]); ob.bob.position.set(x, y, 0); ob.tr.push([x, y, 0]);
+      const W = p.m * p.g, Tn = p.m * (p.g * c + p.L * st.w * st.w), k = p.L * 0.4 / Math.max(W, o.Tmax, 1e-9), P = [x, y, 0.05 * p.L + 0.03], v = st.w * p.L;
+      ob.aT.set(P, [-s * Tn * k, c * Tn * k, 0], 'T ' + fmt(Tn) + ' N'); ob.aW.set(P, [0, -W * k, 0], 'mg ' + fmt(W) + ' N');
+      Math.abs(s) > 1e-3 ? ob.aR.set(P, [-c * W * s * k, -s * W * s * k, 0], 'mg sin θ') : ob.aR.hide();
+      Math.abs(v) > 0.02 ? ob.aV.set([x, y, -0.05 * p.L - 0.03], [c * v * p.L * 0.15, s * v * p.L * 0.15, 0], 'v ' + fmt(Math.abs(v)) + ' m/s') : ob.aV.hide();
+    }
   },
   notes: ['คาบไม่ขึ้นกับมวล และแทบไม่ขึ้นกับมุมถ้ามุมเล็ก (น้อยกว่าประมาณ 15°)', 'ที่มุม 90° คาบจริงยาวกว่าสูตรมุมเล็กประมาณ 18%', 'แรงดึงกลับคือ mg sin θ ซึ่งแปรผันตาม θ เฉพาะเมื่อมุมเล็ก จึงเป็น SHM โดยประมาณ', 'ลากลูกตุ้มเพื่อเลือกมุมปล่อย']
 });
@@ -3673,9 +3796,19 @@ CASES.push({
       const wire = new T.THREE.LineSegments(new T.THREE.WireframeGeometry(new T.THREE.PlaneGeometry(10, 6, 20, 12)), new T.THREE.LineBasicMaterial({ color: T.color('--line'), transparent: true, opacity: 0.4 })); wire.rotation.x = -Math.PI / 2; wire.position.y = -2.25; T.scene.add(wire);
       p.Q.forEach(c => T.label((c.q > 0 ? '+' : '−') + Math.abs(c.q) + ' µC', c.q > 0 ? '--pos' : '--neg', { pos: [c.x, c.q > 0 ? 2.4 : -2.4, -c.y] }));
       T.label('พื้นผิวศักย์ไฟฟ้า: สูง = ศักย์บวก ต่ำ = ศักย์ลบ', '--muted', { pos: [0, 2.8, -3.2] });
-      const ball = T.sphere(0.08, '--c3'); return { ball, Vs };
+      const hY = (x, y) => Math.max(-2.2, Math.min(2.2, field(p.Q, x, y).V / Vs * 0.8));
+      // ลูกศรสนามไฟฟ้าบนพื้นผิว (ยาวตาม log ของขนาด)
+      const Em = []; for (let i = -9; i <= 9; i += 1.5) for (let j = -5; j <= 5; j += 1.25) { const x = i / 2, y = j / 2; if (p.Q.some(c => Math.hypot(x - c.x, y - c.y) < 0.45)) continue; const f = field(p.Q, x, y); if (f.E > 0) Em.push([x, y, f]); }
+      const eMax = Math.max(1e-9, ...Em.map(e => e[2].E));
+      Em.forEach(([x, y, f]) => { const L = 0.15 + 0.4 * Math.max(0, 1 + Math.log10(f.E / eMax) / 2.5); T.vec('--c3', null, { kind: 'v', r: 0.014, top: false }).set([x, hY(x, y) + 0.06, -y], [f.Ex / f.E * L, 0, -f.Ey / f.E * L]); });
+      const ball = T.sphere(0.08, '--c3'); return { ball, Vs, hY, aF: T.vec(p.tq >= 0 ? '--pos' : '--neg', 'F = qE', { r: 0.025 }), aV: T.vec('--c2', 'v', { kind: 'v', r: 0.02 }) };
     },
-    update(ob, st, p) { const V = field(p.Q, st.x, st.y).V / ob.Vs; ob.ball.position.set(st.x, Math.max(-2.2, Math.min(2.2, V * 0.8)) + 0.08, -st.y); }
+    update(ob, st, p) {
+      const P = [st.x, ob.hY(st.x, st.y) + 0.08, -st.y]; ob.ball.position.set(...P);
+      const f = field(p.Q, st.x, st.y), q = p.tq * UC, F = Math.abs(q) * f.E, sg = Math.sign(p.tq) || 1;
+      if (f.E > 0) ob.aF.set([P[0], P[1] + 0.05, P[2]], [sg * f.Ex / f.E * 0.9, 0, -sg * f.Ey / f.E * 0.9], 'F ' + fmt(F) + ' N'); else ob.aF.hide();
+      const v = Math.hypot(st.vx, st.vy); if (v > 1e-6) ob.aV.set([P[0], P[1] + 0.05, P[2]], [st.vx / v * 0.7, 0, -st.vy / v * 0.7], 'v ' + fmt(v) + ' m/s'); else ob.aV.hide();
+    }
   },
   notes: ['เส้นสนามออกจากประจุบวกและพุ่งเข้าหาประจุลบ ไม่ตัดกันเลย', 'เส้นสมศักย์ (แถบเข้ม) ตั้งฉากกับเส้นสนามเสมอ', 'ระหว่างประจุบวกสองตัวมีจุดที่สนามเป็นศูนย์ แต่ศักย์ไม่เป็นศูนย์', 'ประจุทดสอบบวกเคลื่อนที่จากศักย์สูงไปต่ำ (ไหลลงเนินในภาพ 3D) ประจุลบเคลื่อนที่กลับกัน', 'ลากประจุและจุดทดสอบได้ เพิ่มประจุได้ถึง 6 ตัว']
 });
@@ -3838,8 +3971,9 @@ CASES.push({
   },
   three: {
     cam(p, o) { const R = Math.max(o.r || 1, 0.5); return { pos: [R * 4, R * 3, R * 5], target: [-R, R * 1.5, 0] }; },
-    build(T, p, o) { const R = Math.max(o.r || 1, 0.5); for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) T.arrow('--muted', { r: R * 0.01 }).set([-R + i * R * 0.8, -R * 0.5, j * R * 0.8], [0, R * 4, 0]); T.label('B', '--muted', { pos: [-R + 2 * R * 0.8, R * 3.6, 2 * R * 0.8] }); return { ball: T.sphere(R * 0.06, p.q >= 0 ? '--pos' : '--neg'), tr: T.trail('--c1', 3000), aF: T.arrow('--c4', { r: R * 0.015 }), R }; },
-    update(ob, st, p, o) { const q = st.tr[st.tr.length - 1]; if (!q) return; const R = ob.R, sc = R / Math.max(o.r, 1e-9), zz = q[1] / Math.max(1e-9, Math.abs(o.pitch) || 1) * R * 0.9; const P = [q[0] * sc, zz, q[2] * sc]; ob.ball.position.set(...P); if (st.tr.length < 2) ob.tr.clear(); ob.tr.push(P); ob.aF.set(P, [-(q[0] + o.r) / o.r * R * 0.5, 0, -q[2] / o.r * R * 0.5]); }
+    build(T, p, o) { const R = Math.max(o.r || 1, 0.5); for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) T.vec('--muted', i === 2 && j === 2 ? 'B' : null, { kind: 'v', r: R * 0.008, top: false, opacity: 0.5 }).set([-R + i * R * 0.8, -R * 0.5, j * R * 0.8], [0, R * 4, 0]); return { ball: T.sphere(R * 0.06, p.q >= 0 ? '--pos' : '--neg'), tr: T.trail('--c1', 3000), aF: T.vec('--c4', 'F = qvB sinθ', { r: R * 0.015, pad: R * 0.15, ext: R * 0.6 }), aV: T.vec('--c2', 'v', { kind: 'v', r: R * 0.015, pad: R * 0.15 }), R }; },
+    update(ob, st, p, o) { const q = st.tr[st.tr.length - 1]; if (!q) return; const R = ob.R, sc = R / Math.max(o.r, 1e-9), zz = q[1] / Math.max(1e-9, Math.abs(o.pitch) || 1) * R * 0.9; const P = [q[0] * sc, zz, q[2] * sc]; ob.ball.position.set(...P); if (st.tr.length < 2) ob.tr.clear(); ob.tr.push(P); ob.aF.set(P, [-(q[0] + o.r) / o.r * R * 0.5, 0, -q[2] / o.r * R * 0.5], 'F ' + fmt(o.F) + ' N');
+      const w = 2 * Math.PI / 4 * Math.sign(p.q) * -1, d = [-o.r * Math.sin(st.ph) * w * sc, (o.pitch / 4) / Math.max(1e-9, Math.abs(o.pitch) || 1) * R * 0.9, o.r * Math.cos(st.ph) * w * sc], L = Math.hypot(...d); if (L > 1e-12) ob.aV.set(P, d.map(x => x / L * R * 0.7), 'v ' + fmt(p.v) + '×10⁵ m/s'); }
   },
   notes: ['θ = 90° ได้วงกลม θ = 0° หรือ 180° วิ่งตรงตามแนว B ไม่มีแรง มุมอื่นๆ ได้เกลียว', 'คาบไม่ขึ้นกับอัตราเร็ว อนุภาคที่เร็วกว่าวงกว้างกว่าแต่ใช้เวลาต่อรอบเท่ากัน (หลักของไซโคลตรอน)', 'ประจุบวกและลบวนคนละทิศ', 'แรงแม่เหล็กตั้งฉากกับความเร็วเสมอ จึงไม่ทำงาน อัตราเร็วคงที่']
 });
@@ -3959,8 +4093,14 @@ CASES.push({
   plot: { x: { label: 'V', unit: 'L', f: s => (s.q ? s.q.V : NaN) * 1000 }, series: [{ label: 'P', unit: 'kPa', c: '--c4', f: s => s.q ? s.q.P / 1000 : NaN }] },
   three: {
     cam() { return { pos: [1.2, 0.8, 1.6], target: [0.3, 0.2, 0] }; },
-    build(T, p) { const box = T.box(1, 0.5, 0.5, '--water', { opacity: 0.12, cast: false }); box.position.set(0.5, 0.25, 0); const edges = new T.THREE.LineSegments(new T.THREE.EdgesGeometry(new T.THREE.BoxGeometry(1, 0.5, 0.5)), new T.THREE.LineBasicMaterial({ color: T.color('--ink') })); edges.position.set(0.5, 0.25, 0); T.scene.add(edges); const pis = T.box(0.03, 0.5, 0.5, '--muted'); const rod = T.cyl(0.02, 0.02, 1, '--ink'); rod.rotation.z = Math.PI / 2; const balls = Array.from({ length: 60 }, () => T.sphere(0.015, '--c5', { cast: false })); return { pis, rod, balls }; },
-    update(ob, st, p, o) { const q = st.q || o._r.path(0), w = q.V / 0.06; ob.pis.position.set(w, 0.25, 0); ob.rod.position.set(w + 0.5, 0.25, 0); const c = q.T > o._r.T1 + 1 ? '--c1' : q.T < o._r.T1 - 1 ? '--c2' : '--c5'; st.M.forEach((m, i) => { ob.balls[i].position.set(m.x * w, m.y * 0.5, (m.z - 0.5) * 0.5); }); ob.balls[0].material.color.copy(Lab.V3 ? new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue(c).trim()) : ob.balls[0].material.color); ob.balls.forEach(b => { b.material = ob.balls[0].material; }); }
+    build(T, p) { const box = T.box(1, 0.5, 0.5, '--water', { opacity: 0.12, cast: false }); box.position.set(0.5, 0.25, 0); const edges = new T.THREE.LineSegments(new T.THREE.EdgesGeometry(new T.THREE.BoxGeometry(1, 0.5, 0.5)), new T.THREE.LineBasicMaterial({ color: T.color('--ink') })); edges.position.set(0.5, 0.25, 0); T.scene.add(edges); const pis = T.box(0.03, 0.5, 0.5, '--muted'); const rod = T.cyl(0.02, 0.02, 1, '--ink'); rod.rotation.z = Math.PI / 2; const balls = Array.from({ length: 60 }, () => T.sphere(0.015, '--c5', { cast: false }));
+      const mv = Array.from({ length: 8 }, () => T.vec('--c6', null, { kind: 'v', r: 0.005, top: false })), r = gas(p);
+      return { pis, rod, balls, mv, Pm: Math.max(r.P1, r.P2), aF: T.vec('--c4', 'F = PA', { r: 0.012, pad: 0.06 }), aQ: T.vec('--c1', 'Q', { kind: 'v', r: 0.014, pad: 0.06 }) }; },
+    update(ob, st, p, o) { const q = st.q || o._r.path(0), w = q.V / 0.06; ob.pis.position.set(w, 0.25, 0); ob.rod.position.set(w + 0.5, 0.25, 0); const c = q.T > o._r.T1 + 1 ? '--c1' : q.T < o._r.T1 - 1 ? '--c2' : '--c5'; st.M.forEach((m, i) => { ob.balls[i].position.set(m.x * w, m.y * 0.5, (m.z - 0.5) * 0.5); }); ob.balls[0].material.color.copy(Lab.V3 ? new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue(c).trim()) : ob.balls[0].material.color); ob.balls.forEach(b => { b.material = ob.balls[0].material; });
+      const sp = Math.sqrt(q.T / 300) * 0.1; ob.mv.forEach((a, i) => { const m = st.M[i * 7]; a.set([m.x * w, m.y * 0.5, (m.z - 0.5) * 0.5], [m.vx * sp, m.vy * sp, m.vz * sp]); });
+      ob.aF.set([w + 0.02, 0.25, 0.27], [0.35 * q.P / ob.Pm, 0, 0], 'แรงจากแก๊ส P = ' + fmt(q.P / 1000) + ' kPa');
+      if (p.proc !== 'Q' && Math.abs(o.Q) > 1) { const up = o.Q > 0; ob.aQ.set([w / 2, up ? -0.3 : -0.05, 0.27], [0, up ? 0.25 : -0.25, 0], up ? 'ให้ความร้อน Q' : 'คายความร้อน Q'); } else ob.aQ.hide();
+    }
   },
   notes: ['อุณหภูมิคงที่: พลังงานภายในไม่เปลี่ยน ความร้อนที่ให้กลายเป็นงานทั้งหมด', 'ความดันคงที่: ขยายตัวแล้วอุณหภูมิเพิ่ม ต้องให้ความร้อนมากกว่างานที่ได้', 'ปริมาตรคงที่: ไม่มีงาน ความร้อนทั้งหมดเพิ่มพลังงานภายใน', 'แอเดียแบติก: ไม่มีความร้อนเข้าออก ขยายตัวแล้วเย็นลง (โมเลกุลช้าลง)', 'ความเร็วโมเลกุลแปรผันตาม √T สีส้ม = ร้อนกว่าเริ่มต้น สีน้ำเงิน = เย็นกว่า']
 });
@@ -4184,8 +4324,12 @@ CASES.push({
   plot: { x: { label: 'ε', unit: '×10⁻³', f: s => (s.e || 0) * 1000 }, series: [{ label: 'σ', unit: 'MPa', c: '--c1', f: s => (s.s || 0) / 1e6 }] },
   three: {
     cam() { return { pos: [1.2, -1.5, 3.2], target: [0, -1.5, 0] }; },
-    build(T, p) { const c = T.box(1, 0.06, 0.5, '--ink'); c.position.y = 0.03; const wire = T.cyl(1, 1, 1, '--muted'); const box = T.box(0.45, 0.4, 0.45, '--c2'); return { wire, box }; },
-    update(ob, st, p, o) { const ext = Math.min(1.2, (st.e || 0) * p.ex * 1.3), L = 2.2 + ext, r = 0.006 + p.d * 0.004; if (st.broke) { ob.wire.scale.set(r, 1.3, r); ob.wire.position.y = -0.65; ob.box.position.y = -L - 0.3 - 4 * (st.fall || 0) ** 2; } else { ob.wire.scale.set(r * (1 - ext * 0.15), L, r * (1 - ext * 0.15)); ob.wire.position.y = -L / 2; ob.box.position.y = -L - 0.2; } }
+    build(T, p) { const c = T.box(1, 0.06, 0.5, '--ink'); c.position.y = 0.03; const wire = T.cyl(1, 1, 1, '--muted'); const box = T.box(0.45, 0.4, 0.45, '--c2'), o3 = { r: 0.015, pad: 0.1 }; return { wire, box, aT: T.vec('--c3', 'T', o3), aW: T.vec('--c1', 'mg', o3) }; },
+    update(ob, st, p, o) { const ext = Math.min(1.2, (st.e || 0) * p.ex * 1.3), L = 2.2 + ext, r = 0.006 + p.d * 0.004; if (st.broke) { ob.wire.scale.set(r, 1.3, r); ob.wire.position.y = -0.65; ob.box.position.y = -L - 0.3 - 4 * (st.fall || 0) ** 2; } else { ob.wire.scale.set(r * (1 - ext * 0.15), L, r * (1 - ext * 0.15)); ob.wire.position.y = -L / 2; ob.box.position.y = -L - 0.2; }
+      const F = p.m * G * (st.f || 0), k = 0.7 / (p.m * G), y = ob.box.position.y, z = 0.25;
+      if (F > 1e-6 && !st.broke) { ob.aT.set([0.12, y + 0.2, z], [0, F * k, 0], 'T ' + fmt(F) + ' N'); ob.aW.set([-0.12, y, z], [0, -F * k, 0], 'mg ' + fmt(F) + ' N'); }
+      else if (st.broke) { ob.aT.hide(); ob.aW.set([0, y, z], [0, -0.7, 0], 'mg (ตกอิสระ)'); } else { ob.aT.hide(); ob.aW.hide(); }
+    }
   },
   notes: ['ในช่วงเส้นตรง ความเค้นแปรผันตรงกับความเครียด ความชันคือมอดุลัสของยัง ซึ่งเป็นสมบัติของวัสดุ ไม่ขึ้นกับขนาดลวด', 'ลวดยาวขึ้น 2 เท่า ยืดเพิ่ม 2 เท่า เส้นผ่านศูนย์กลางเพิ่ม 2 เท่า พื้นที่เพิ่ม 4 เท่า ยืดลดลง 4 เท่า', 'เลยจุดครากไปแล้ว เมื่อเอาน้ำหนักออก ลวดจะยาวกว่าเดิมถาวร', 'ค่าวัสดุเป็นค่าประมาณเพื่อการเรียนรู้']
 });
@@ -4294,8 +4438,14 @@ CASES.push({
   live: [{ name: 'B', unit: 'N', f: s => s.B || 0 }, { name: 'v', unit: 'm/s', f: s => s.v }],
   three: {
     cam(p) { const W = p.W / 100; return { pos: [W * 0.9, 0.9, W * 1.6], target: [0, 0.4, 0] }; },
-    build(T, p) { const W = p.W / 100; T.floor(3, { step: 0.1 }); const glass = T.box(W, 1, W, '--water', { opacity: 0.08, cast: false }); glass.position.y = 0.5; const eg = new T.THREE.LineSegments(new T.THREE.EdgesGeometry(new T.THREE.BoxGeometry(W, 1, W)), new T.THREE.LineBasicMaterial({ color: T.color('--ink') })); eg.position.y = 0.5; T.scene.add(eg); const wat = T.box(W * 0.98, 1, W * 0.98, '--water', { opacity: 0.35, cast: false }); const blk = T.box(p.a / 100, p.a / 100, p.a / 100, '--block2'); return { wat, blk }; },
-    update(ob, st) { const H = st.H || 0.5; ob.wat.scale.y = H; ob.wat.position.y = H / 2; ob.blk.position.y = st.y + st.a / 2; }
+    build(T, p) { const W = p.W / 100; T.floor(3, { step: 0.1 }); const glass = T.box(W, 1, W, '--water', { opacity: 0.08, cast: false }); glass.position.y = 0.5; const eg = new T.THREE.LineSegments(new T.THREE.EdgesGeometry(new T.THREE.BoxGeometry(W, 1, W)), new T.THREE.LineBasicMaterial({ color: T.color('--ink') })); eg.position.y = 0.5; T.scene.add(eg); const wat = T.box(W * 0.98, 1, W * 0.98, '--water', { opacity: 0.35, cast: false }); const blk = T.box(p.a / 100, p.a / 100, p.a / 100, '--block2'), o3 = { r: 0.008, pad: 0.05 }; return { wat, blk, aW: T.vec('--c1', 'mg', o3), aB: T.vec('--c2', 'B', o3), aN: T.vec('--c3', 'N', o3) }; },
+    update(ob, st, p, o) {
+      const H = st.H || 0.5, a = st.a; ob.wat.scale.y = H; ob.wat.position.y = H / 2; ob.blk.position.y = st.y + a / 2;
+      const k = 0.32 / Math.max(o.m * G, st.B || 0, 1e-9), z = a / 2 + 0.01, yc = st.y + a / 2;
+      ob.aW.set([0, yc, z], [0, -o.m * G * k, 0], 'mg ' + fmt(o.m * G) + ' N');
+      if (st.B > 0.01) ob.aB.set([a * 0.3, yc, z], [0, st.B * k, 0], 'B ' + fmt(st.B) + ' N'); else ob.aB.hide();
+      if (st.N > 0.01) ob.aN.set([-a * 0.3, st.y, z], [0, st.N * k, 0], 'N ' + fmt(st.N) + ' N'); else ob.aN.hide();
+    }
   },
   notes: ['วัตถุลอย แรงลอยตัวเท่ากับน้ำหนักพอดี ไม่ว่าจะเป็นของเหลวอะไร แต่จมลึกต่างกัน', 'ส่วนที่จม = ρวัตถุ/ρของเหลว เช่น น้ำแข็งในน้ำจมประมาณ 92%', 'วัตถุจม แรงลอยตัวสูงสุด = ρของเหลว gV ที่เหลือพื้นรับไว้', 'ลากกล่องขึ้นลงเพื่อเปลี่ยนความสูงที่ปล่อย']
 });
@@ -4370,6 +4520,9 @@ CASES.push({
       const geo = new T.THREE.LatheGeometry(pts, 48); geo.rotateZ(-Math.PI / 2);
       T.mesh(geo, '--water', { opacity: 0.25, side: T.THREE.DoubleSide, cast: false });
       const balls = []; for (let i = 0; i < 140; i++) balls.push(T.sphere(0.5, '--c2', { cast: false }));
+      // เวกเตอร์ความเร็วของไหลที่หน้าตัดกว้างและแคบ
+      const v2 = p.v1 * (p.r1 / p.r2) ** 2, kv = 14 / Math.max(p.v1, v2), o3 = { kind: 'v', r: 0.45, pad: 3 };
+      [[15, p.v1, 'v₁'], [50, v2, 'v₂']].forEach(([x, v, n]) => { const r = rad(p, x); [[0, 0], [0.55, 0], [-0.55, 0], [0, 0.55], [0, -0.55]].forEach(([a, b], j) => T.vec('--c1', j ? null : '', o3).set([x - v * kv / 2, a * r, b * r], [v * kv, 0, 0], n + ' = ' + fmt(v) + ' m/s')); });
       return { balls };
     },
     update(ob, st, p) { st.P.forEach((q, i) => { const r = rad(p, q.x) * 0.85, a = i * 2.39996; ob.balls[i].position.set(q.x, q.y * r * Math.cos(a), q.y * r * Math.sin(a)); }); }
@@ -4694,8 +4847,12 @@ CASES.push({
   handles(p) { return [{ id: 's2', x: p.d / 2, y: 0, set: x => ({ d: clamp(2 * Math.abs(x), 0.5, 10) }) }, { id: 'P', x: p.px, y: p.py, set: (x, y) => ({ px: clamp(x, -12, 12), py: clamp(y, 0.5, 13) }) }]; },
   three: {
     cam() { return { pos: [0, 9, 14], target: [0, 0, -5] }; },
-    build(T, p) { const geo = new T.THREE.PlaneGeometry(26, 14, 130, 70); geo.rotateX(-Math.PI / 2); geo.translate(0, 0, -7); const m = T.mesh(geo, '--water', { cast: false }); m.material.flatShading = false; [-1, 1].forEach(s => { const c = T.cyl(0.15, 0.15, 1.2, '--ink'); c.position.set(s * p.d / 2, 0.3, 0); }); return { geo }; },
-    update(ob, st, p) { const pos = ob.geo.attributes.position, k = 2 * Math.PI / p.lam, wt = st.t * 2 * Math.PI * 1.2, ph = p.ph * RAD; for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), y = -pos.getZ(i), r1 = Math.hypot(x + p.d / 2, y), r2 = Math.hypot(x - p.d / 2, y); pos.setY(i, 0.35 * (Math.sin(wt - k * r1) / Math.sqrt(1 + r1) + Math.sin(wt - k * r2 + ph) / Math.sqrt(1 + r2))); } pos.needsUpdate = true; ob.geo.computeVertexNormals(); }
+    build(T, p) { const geo = new T.THREE.PlaneGeometry(26, 14, 130, 70); geo.rotateX(-Math.PI / 2); geo.translate(0, 0, -7); const m = T.mesh(geo, '--water', { cast: false }); m.material.flatShading = false; [-1, 1].forEach(s => { const c = T.cyl(0.15, 0.15, 1.2, '--ink'); c.position.set(s * p.d / 2, 0.3, 0); });
+      const r1 = Math.hypot(p.px + p.d / 2, p.py), r2 = Math.hypot(p.px - p.d / 2, p.py), o3 = { kind: 'v', r: 0.06, mid: true };
+      T.vec('--c1', '', o3).set([-p.d / 2, 0.7, 0], [p.px + p.d / 2, 0, -p.py], 'S₁P = ' + fmt(r1) + ' cm'); T.vec('--c3', '', o3).set([p.d / 2, 0.7, 0], [p.px - p.d / 2, 0, -p.py], 'S₂P = ' + fmt(r2) + ' cm');
+      const P = T.sphere(0.22, '--c5'); return { geo, P }; },
+    update(ob, st, p) { const pos = ob.geo.attributes.position, k = 2 * Math.PI / p.lam, wt = st.t * 2 * Math.PI * 1.2, ph = p.ph * RAD; for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), y = -pos.getZ(i), r1 = Math.hypot(x + p.d / 2, y), r2 = Math.hypot(x - p.d / 2, y); pos.setY(i, 0.35 * (Math.sin(wt - k * r1) / Math.sqrt(1 + r1) + Math.sin(wt - k * r2 + ph) / Math.sqrt(1 + r2))); } pos.needsUpdate = true; ob.geo.computeVertexNormals();
+      const r1 = Math.hypot(p.px + p.d / 2, p.py), r2 = Math.hypot(p.px - p.d / 2, p.py); ob.P.position.set(p.px, 0.35 * (Math.sin(wt - k * r1) / Math.sqrt(1 + r1) + Math.sin(wt - k * r2 + ph) / Math.sqrt(1 + r2)) + 0.2, -p.py); }
   },
   notes: ['แนวปฏิบัพกลาง (ผลต่างระยะ = 0) อยู่ตรงกลางเมื่อแหล่งกำเนิดเฟสตรงกัน', 'ลด λ หรือเพิ่ม d จะได้จำนวนแนวมากขึ้นและชิดกันมากขึ้น', 'ปรับเฟสต่างกัน 180° แนวกลางกลายเป็นแนวบัพ', 'ลาก S₂ เพื่อเปลี่ยนระยะห่าง ลากจุดตรวจ P เพื่ออ่านผลต่างระยะทาง']
 });
@@ -5533,12 +5690,15 @@ CASES.push({
       pnl.position.y = 0.9; pnl.rotation.order = 'YXZ'; pnl.rotation.y = -(p.az * RAD) + Math.PI; pnl.rotation.x = -p.tilt * RAD;
       const leg = T.cyl(0.06, 0.06, 0.9, '--muted'); leg.position.y = 0.45;
       const sun = T.sphere(0.45, '--c5', { emissive: '--c5', ei: 0.9, cast: false });
-      return { sun, lab: T.label('', '--c5') };
+      const b = p.tilt * RAD, g2 = p.az * RAD, n = [Math.sin(b) * Math.sin(g2), Math.sin(b) * Math.cos(g2), Math.cos(b)];
+      T.vec('--c2', '', { kind: 'v', r: 0.035, pad: 0.3 }).set([0, 0.95, 0], [n[0] * 1.8, n[2] * 1.8, -n[1] * 1.8], 'แนวตั้งฉากแผง');
+      return { sun, lab: T.label('', '--c5'), ray: T.vec('--c5', '', { kind: 'v', r: 0.045, pad: 0.3, tail: true }) };
     },
     update(ob, st, p, o, T) {
       const s = sunVec(p.lat, p.day, st.h); ob.sun.position.set(s[0] * 7, s[2] * 7, -s[1] * 7); ob.sun.visible = s[2] > 0;
       const V3 = T.scene.children.find(c => c.isDirectionalLight); if (V3) { V3.position.set(s[0] * 30, Math.max(0.5, s[2] * 30), -s[1] * 30); V3.intensity = s[2] > 0 ? 0.9 : 0.05; }
       const r = panelPower(p, st.h); ob.lab.set(fmt(r.P / 1000) + ' kW', [0, 2.2, 0]);
+      if (s[2] > 0) { const L = 2.6, c = [0, 0.95, 0]; ob.ray.set([c[0] + s[0] * (L + 0.3), c[1] + s[2] * (L + 0.3), c[2] - s[1] * (L + 0.3)], [-s[0] * L, -s[2] * L, s[1] * L], 'แสงอาทิตย์ มุมตกกระทบ ' + fmt(Math.acos(clamp(r.cos, 0, 1)) * DEG) + '°'); } else ob.ray.hide();
     }
   },
   notes: ['แสงตั้งฉากกับแผงได้กำลังมากที่สุด เช้าเย็นแสงต้องผ่านบรรยากาศหนาจึงอ่อนลง', 'ประเทศไทยอยู่เหนือเส้นศูนย์สูตร ดวงอาทิตย์อยู่ค่อนไปทางใต้เกือบทั้งปี แผงจึงหันทิศใต้', 'ฤดูร้อน (เม.ย.–มิ.ย.) ดวงอาทิตย์ขึ้นสูงและวันยาว ธันวาคมดวงอาทิตย์ต่ำกว่า', 'ค่าในแบบจำลองเป็นการประมาณท้องฟ้าโปร่ง ค่าจริงขึ้นกับเมฆ ฝุ่น และอุณหภูมิแผง']

@@ -48,13 +48,12 @@ CASES.push({
       T.floor(p.L * 4, { y: -p.L * 1.3, step: 0.25 });
       const circ = []; for (let i = 0; i <= 64; i++) { const a = i / 64 * 2 * Math.PI; circ.push([o.r * Math.cos(a), -h, o.r * Math.sin(a)]); } T.line('--muted', { pts: circ, max: 65 });
       const cone = T.mesh(new T.THREE.ConeGeometry(o.r, h, 48, 1, true), '--water', { opacity: 0.12, side: T.THREE.DoubleSide, cast: false }); cone.position.y = -h / 2; cone.rotation.x = Math.PI;
-      return { rope: T.line('--rope', { max: 2 }), bob: T.sphere(0.06 * p.L + 0.02, '--c1'), aT: T.arrow('--c3', { r: 0.012 }), aW: T.arrow('--c1', { r: 0.012 }), aC: T.arrow('--c4', { r: 0.012 }), aV: T.arrow('--c2', { r: 0.012 }), lT: T.label('T', '--c3'), lW: T.label('mg', '--c1'), lC: T.label('ΣF สู่ศูนย์กลาง', '--c4'), h };
+      return { rope: T.line('--rope', { max: 2 }), bob: T.sphere(0.06 * p.L + 0.02, '--c1'), aT: T.vec('--c3', 'T', { r: 0.012, pad: 0.08 }), aW: T.vec('--c1', 'mg', { r: 0.012, pad: 0.08 }), aC: T.vec('--c4', 'ΣF', { r: 0.012, pad: 0.08 }), aV: T.vec('--c2', 'v', { kind: 'v', r: 0.012, pad: 0.08 }), h };
     },
     update(ob, st, p, o) {
       const x = o.r * Math.cos(st.ph), z = o.r * Math.sin(st.ph), P = [x, -ob.h, z], k = p.L * 0.45 / o.T;
       ob.rope.set([[0, 0, 0], P]); ob.bob.position.set(...P);
-      ob.aT.set(P, [-x / p.L * o.T * k, ob.h / p.L * o.T * k, -z / p.L * o.T * k]); ob.aW.set(P, [0, -p.m * p.g * k, 0]); ob.aC.set(P, [-x / o.r * o.Fc * k, 0, -z / o.r * o.Fc * k]); ob.aV.set(P, [-z / o.r * p.L * 0.3, 0, x / o.r * p.L * 0.3]);
-      ob.lT.set(null, [P[0] - x / p.L * o.T * k, P[1] + ob.h / p.L * o.T * k, P[2] - z / p.L * o.T * k]); ob.lW.set(null, [P[0], P[1] - p.m * p.g * k - 0.05, P[2]]); ob.lC.set(null, [P[0] - x / o.r * o.Fc * k * 1.1, P[1] - 0.05, P[2] - z / o.r * o.Fc * k * 1.1]);
+      ob.aT.set(P, [-x / p.L * o.T * k, ob.h / p.L * o.T * k, -z / p.L * o.T * k], 'T ' + fmt(o.T) + ' N'); ob.aW.set(P, [0, -p.m * p.g * k, 0], 'mg ' + fmt(p.m * p.g) + ' N'); ob.aC.set(P, [-x / o.r * o.Fc * k, 0, -z / o.r * o.Fc * k], 'ΣF ' + fmt(o.Fc) + ' N'); ob.aV.set(P, [-z / o.r * p.L * 0.3, 0, x / o.r * p.L * 0.3], 'v ' + fmt(o.v) + ' m/s');
     }
   },
   notes: ['มุมกว้างขึ้น ต้องหมุนเร็วขึ้น และแรงตึงเพิ่มขึ้นมาก (T = mg/cos θ)', 'คาบขึ้นกับความสูงของกรวย L cos θ ไม่ขึ้นกับมวล', 'แรงลัพธ์ (ΣF) ชี้เข้าหาศูนย์กลางวงกลมแนวระดับเสมอ ไม่ใช่ชี้ไปที่จุดแขวน', 'หมุนมุมกล้องในมุมมอง 3D เพื่อดูรูปกรวย']
@@ -164,9 +163,16 @@ CASES.push({
       geo.setAttribute('position', new T.THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
       T.mesh(geo, '--ground', { side: T.THREE.DoubleSide, receive: true, cast: false });
       T.floor(p.r * 3, { y: -w * 0.6, step: K.niceStep(p.r / 4) });
-      const car = K.car3d(T, '--c1', Math.max(6, p.r * 0.11)); return { car, th, w, lab: T.label('', '--ink') };
+      const cs = Math.max(6, p.r * 0.11), car = K.car3d(T, '--c1', cs), o3 = { r: cs * 0.03, pad: cs * 0.25 };
+      return { car, th, w, cs, lab: T.label('', '--ink'), aW: T.vec('--c1', 'mg', o3), aN: T.vec('--c2', 'N', o3), aF: T.vec('--c3', 'f', o3), aS: T.vec('--c4', 'ΣF', o3), aV: T.vec('--c6', 'v', Object.assign({ kind: 'v' }, o3)) };
     },
-    update(ob, st, p, o) { const a = st.ang, d = clamp(st.drift, -1.2, 1.2) * ob.w * 0.4, rr = p.r + d * Math.cos(ob.th), y = d * Math.sin(ob.th); ob.car.position.set(rr * Math.cos(a), y + 0.1, -rr * Math.sin(a)); ob.car.rotation.set(0, a + Math.PI, 0); ob.car.rotateX(-ob.th * 0); ob.car.rotateZ(0); ob.car.children.forEach(() => {}); ob.lab.set(fmt(p.v) + ' km/h', [rr * Math.cos(a), y + ob.w * 0.5, -rr * Math.sin(a)]); }
+    update(ob, st, p, o) { const a = st.ang, d = clamp(st.drift, -1.2, 1.2) * ob.w * 0.4, rr = p.r + d * Math.cos(ob.th), y = d * Math.sin(ob.th); ob.car.position.set(rr * Math.cos(a), y + 0.1, -rr * Math.sin(a)); ob.car.rotation.set(0, a + Math.PI, 0); ob.car.rotateX(-ob.th * 0); ob.car.rotateZ(0); ob.car.children.forEach(() => {}); ob.lab.set(fmt(p.v) + ' km/h', [(rr + ob.cs * 1.6) * Math.cos(a), y, -(rr + ob.cs * 1.6) * Math.sin(a)]);
+      const b = o._b, k = ob.cs * 2 / (p.m * 9.8), c = Math.cos(ob.th), s = Math.sin(ob.th), ix = -Math.cos(a), iz = Math.sin(a), P = [rr * Math.cos(a), y + ob.cs * 0.35, -rr * Math.sin(a)];
+      const Fc = p.m * b.v * b.v / p.r;
+      ob.aW.set(P, [0, -p.m * 9.8 * k, 0], 'mg'); ob.aN.set(P, [ix * s * b.N * k, c * b.N * k, iz * s * b.N * k], 'N ' + fmt(b.N) + ' N');
+      if (Math.abs(b.f) > 1) ob.aF.set(P, [ix * c * b.f * k, -s * b.f * k, iz * c * b.f * k], 'f ' + fmt(Math.abs(b.f)) + ' N'); else ob.aF.hide();
+      ob.aS.set(P, [ix * Fc * k, 0, iz * Fc * k], 'ΣF = mv²/r'); ob.aV.set(P, [-Math.sin(a) * ob.cs * 1.6, 0, -Math.cos(a) * ob.cs * 1.6], 'v');
+    }
   },
   notes: ['ความเร็วพอดี (v₀) แรงเสียดทานเป็นศูนย์ แรงปฏิกิริยาตั้งฉากแนวระดับทำหน้าที่เป็นแรงสู่ศูนย์กลาง', 'เร็วกว่า v₀ แรงเสียดทานต้องชี้ลงตามพื้นเอียง ช้ากว่า v₀ ต้องชี้ขึ้น', 'ถนนเอียงมากขึ้น ความเร็วที่ปลอดภัยสูงขึ้น', 'ดูมุมมอง 3D เพื่อเห็นรถวิ่งรอบสนาม']
 });
@@ -213,9 +219,14 @@ CASES.push({
   },
   live: [{ name: 'ระยะจากศูนย์กลาง', unit: 'km', f: s => Math.hypot(s.x, s.y) / 1000 }, { name: 'อัตราเร็ว', unit: 'km/s', f: s => Math.hypot(s.vx, s.vy) / 1000 }],
   three: {
-    cam(p, o) { const R = isFinite(o._a) ? Math.max(o._r, 2 * o._a - o._r) : o._r * 2; const s = 1e-6; return { pos: [0, R * s * 1.2, R * s * 2.2], target: [0, 0, 0] }; },
-    build(T, p, o) { const s = 1e-6; const pl = T.sphere(o._R * s, '--c2'); pl.castShadow = false; const ring = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * 2 * Math.PI; ring.push([o._r * s * Math.cos(a), 0, -o._r * s * Math.sin(a)]); } T.line('--line', { pts: ring, max: 97 }); return { sat: T.sphere(o._R * s * 0.06, '--c1'), tr: T.trail('--c1', 3000), s }; },
-    update(ob, st) { ob.sat.position.set(st.x * ob.s, 0, -st.y * ob.s); if (st.t === 0) ob.tr.clear(); ob.tr.push([st.x * ob.s, 0, -st.y * ob.s]); }
+    cam(p, o) { const R = isFinite(o._a) ? Math.max(o._r, 2 * o._a - o._r) : o._r * 2; const s = 1e-6; return { pos: [0, R * s * 2.4, R * s * 1.1], target: [0, 0, 0] }; },
+    build(T, p, o) { const s = 1e-6; const pl = T.sphere(o._R * s, '--c2'); pl.castShadow = false; const ring = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * 2 * Math.PI; ring.push([o._r * s * Math.cos(a), 0, -o._r * s * Math.sin(a)]); } T.line('--line', { pts: ring, max: 97 }); const o3 = { r: o._R * s * 0.018, pad: o._R * s * 0.2 }; return { sat: T.sphere(o._R * s * 0.06, '--c1'), tr: T.trail('--c1', 3000), s, aV: T.vec('--c3', 'v', Object.assign({ kind: 'v' }, o3)), aF: T.vec('--c4', 'F_G', Object.assign({ ext: 0 }, o3)) }; },
+    update(ob, st, p, o) {
+      const P = [st.x * ob.s, 0, -st.y * ob.s]; ob.sat.position.set(...P); if (st.t === 0) ob.tr.clear(); ob.tr.push(P);
+      const r = Math.hypot(st.x, st.y), v = Math.hypot(st.vx, st.vy), L = o._r * ob.s * 0.45;
+      ob.aV.set(P, [st.vx / o._v * L, 0, -st.vy / o._v * L], 'v ' + fmt(v / 1000) + ' km/s');
+      const fl = L * 0.35 * Math.min(3, (o._r / r) ** 2); ob.aF.set(P, [-st.x / r * fl, 0, st.y / r * fl], 'F_G');
+    }
   },
   notes: ['ความเร็วพอดีกับ √(GM/r) ได้วงกลม มากกว่าได้วงรีที่จุดยิงเป็นจุดใกล้สุด น้อยกว่าได้วงรีที่จุดยิงเป็นจุดไกลสุด', 'ดาวเทียมเคลื่อนที่เร็วเมื่ออยู่ใกล้และช้าเมื่ออยู่ไกล (กฎข้อ 2 ของเคปเลอร์)', 'ความเร็ววงโคจรวงกลมไม่ขึ้นกับมวลดาวเทียม', 'ภาพเร่งเวลาให้ 1 รอบใช้ประมาณ 8 วินาที']
 });
@@ -254,8 +265,11 @@ CASES.push({
   handles(p) { return [{ id: 'r', x: p.r / 100, y: 0, set: (x, y) => ({ r: clamp(Math.hypot(x, y) * 100, 1, 15) }) }]; },
   three: {
     cam() { return { pos: [0, 0.35, 0.45], target: [0, 0, 0] }; },
-    build(T) { const d = T.cyl(0.17, 0.17, 0.012, '--block', { receive: true }); d.position.y = -0.006; const sp = T.box(0.17, 0.002, 0.01, '--c4'); sp.position.y = 0.001; const c = T.cyl(0.012, 0.012, 0.004, '--c5'); return { d, sp, c }; },
-    update(ob, st) { ob.d.rotation.y = -st.ang; ob.sp.rotation.y = -st.ang; ob.sp.position.set(0.085 * Math.cos(st.ang), 0.001, -0.085 * Math.sin(st.ang)); ob.c.position.set(st.x, 0.004, -st.y); }
+    build(T) { const d = T.cyl(0.17, 0.17, 0.012, '--block', { receive: true }); d.position.y = -0.006; const sp = T.box(0.17, 0.002, 0.01, '--c4'); sp.position.y = 0.001; const c = T.cyl(0.012, 0.012, 0.004, '--c5'), o3 = { r: 0.0035, pad: 0.018 }; return { d, sp, c, aF: T.vec('--c3', 'fₛ', o3), aV: T.vec('--c2', 'v', Object.assign({ kind: 'v' }, o3)) }; },
+    update(ob, st, p, o) {
+      const P = [st.x, 0.012, -st.y], r = Math.hypot(st.x, st.y) || 1;
+      if (!st.slip) { ob.aF.set(P, [-st.x / r * 0.07, 0, st.y / r * 0.07], 'fₛ = mω²r'); ob.aV.set(P, [-st.y / r * 0.08, 0, -st.x / r * 0.08], 'v'); }
+      else { ob.aF.hide(); const vv = Math.hypot(st.vx, st.vy) || 1; ob.aV.set(P, [st.vx / vv * 0.08, 0, -st.vy / vv * 0.08], 'v'); } ob.d.rotation.y = -st.ang; ob.sp.rotation.y = -st.ang; ob.sp.position.set(0.085 * Math.cos(st.ang), 0.001, -0.085 * Math.sin(st.ang)); ob.c.position.set(st.x, 0.004, -st.y); }
   },
   notes: ['ระยะจากแกนมากขึ้น ต้องการแรงสู่ศูนย์กลางมากขึ้น (mω²r) จึงไถลง่ายกว่า', 'เหรียญที่ไถลออกไปในแนวเส้นสัมผัส ไม่ได้พุ่งออกตามแนวรัศมี', 'ลากเหรียญเพื่อเปลี่ยนระยะจากแกน']
 });

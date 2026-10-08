@@ -88,8 +88,12 @@ CASES.push({
   handles(p) { return [{ id: 's2', x: p.d / 2, y: 0, set: x => ({ d: clamp(2 * Math.abs(x), 0.5, 10) }) }, { id: 'P', x: p.px, y: p.py, set: (x, y) => ({ px: clamp(x, -12, 12), py: clamp(y, 0.5, 13) }) }]; },
   three: {
     cam() { return { pos: [0, 9, 14], target: [0, 0, -5] }; },
-    build(T, p) { const geo = new T.THREE.PlaneGeometry(26, 14, 130, 70); geo.rotateX(-Math.PI / 2); geo.translate(0, 0, -7); const m = T.mesh(geo, '--water', { cast: false }); m.material.flatShading = false; [-1, 1].forEach(s => { const c = T.cyl(0.15, 0.15, 1.2, '--ink'); c.position.set(s * p.d / 2, 0.3, 0); }); return { geo }; },
-    update(ob, st, p) { const pos = ob.geo.attributes.position, k = 2 * Math.PI / p.lam, wt = st.t * 2 * Math.PI * 1.2, ph = p.ph * RAD; for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), y = -pos.getZ(i), r1 = Math.hypot(x + p.d / 2, y), r2 = Math.hypot(x - p.d / 2, y); pos.setY(i, 0.35 * (Math.sin(wt - k * r1) / Math.sqrt(1 + r1) + Math.sin(wt - k * r2 + ph) / Math.sqrt(1 + r2))); } pos.needsUpdate = true; ob.geo.computeVertexNormals(); }
+    build(T, p) { const geo = new T.THREE.PlaneGeometry(26, 14, 130, 70); geo.rotateX(-Math.PI / 2); geo.translate(0, 0, -7); const m = T.mesh(geo, '--water', { cast: false }); m.material.flatShading = false; [-1, 1].forEach(s => { const c = T.cyl(0.15, 0.15, 1.2, '--ink'); c.position.set(s * p.d / 2, 0.3, 0); });
+      const r1 = Math.hypot(p.px + p.d / 2, p.py), r2 = Math.hypot(p.px - p.d / 2, p.py), o3 = { kind: 'v', r: 0.06, mid: true };
+      T.vec('--c1', '', o3).set([-p.d / 2, 0.7, 0], [p.px + p.d / 2, 0, -p.py], 'S₁P = ' + fmt(r1) + ' cm'); T.vec('--c3', '', o3).set([p.d / 2, 0.7, 0], [p.px - p.d / 2, 0, -p.py], 'S₂P = ' + fmt(r2) + ' cm');
+      const P = T.sphere(0.22, '--c5'); return { geo, P }; },
+    update(ob, st, p) { const pos = ob.geo.attributes.position, k = 2 * Math.PI / p.lam, wt = st.t * 2 * Math.PI * 1.2, ph = p.ph * RAD; for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), y = -pos.getZ(i), r1 = Math.hypot(x + p.d / 2, y), r2 = Math.hypot(x - p.d / 2, y); pos.setY(i, 0.35 * (Math.sin(wt - k * r1) / Math.sqrt(1 + r1) + Math.sin(wt - k * r2 + ph) / Math.sqrt(1 + r2))); } pos.needsUpdate = true; ob.geo.computeVertexNormals();
+      const r1 = Math.hypot(p.px + p.d / 2, p.py), r2 = Math.hypot(p.px - p.d / 2, p.py); ob.P.position.set(p.px, 0.35 * (Math.sin(wt - k * r1) / Math.sqrt(1 + r1) + Math.sin(wt - k * r2 + ph) / Math.sqrt(1 + r2)) + 0.2, -p.py); }
   },
   notes: ['แนวปฏิบัพกลาง (ผลต่างระยะ = 0) อยู่ตรงกลางเมื่อแหล่งกำเนิดเฟสตรงกัน', 'ลด λ หรือเพิ่ม d จะได้จำนวนแนวมากขึ้นและชิดกันมากขึ้น', 'ปรับเฟสต่างกัน 180° แนวกลางกลายเป็นแนวบัพ', 'ลาก S₂ เพื่อเปลี่ยนระยะห่าง ลากจุดตรวจ P เพื่ออ่านผลต่างระยะทาง']
 });

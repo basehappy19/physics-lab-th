@@ -165,10 +165,16 @@ CASES.push({
         if (sp.type === 'rope') return { kind: 'rope', x, l: T.line('--rope', { max: 2 }) };
         return { kind: sp.type, x, l: T.spring('--spring', { coils: 10, r: 0.1 }) };
       });
-      return { beam, parts };
+      const all = r.W.map(q => q.w).concat(r.S.map(q => Math.abs(q.F))), k = 1.3 / Math.max(1e-9, ...all), o3 = { r: 0.03, pad: 0.2 };
+      const wA = r.W.map(q => ({ q, a: T.vec('--c1', (q.beam ? 'W คาน ' : 'W ') + fmt(q.w) + ' N', o3) }));
+      const sA = r.S.map(q => ({ q, a: T.vec('--c3', fmt(q.F) + ' N', o3) }));
+      return { beam, parts, wA, sA, k, ok: r.ok };
     },
     update(ob, st, p) {
       const xc = p.L / 2; ob.beam.position.set(xc, st.y, 0); ob.beam.rotation.z = st.th;
+      const P = x => [xc + (x - xc) * Math.cos(st.th), st.y + (x - xc) * Math.sin(st.th), 0.32];
+      ob.wA.forEach(({ q, a }) => ob.ok ? a.set(P(q.x), [0, -q.w * ob.k, 0]) : a.hide());
+      ob.sA.forEach(({ q, a }) => ob.ok && q.on && Math.abs(q.F) > 1e-6 ? a.set(P(q.x), [0, q.F * ob.k, 0]) : a.hide());
       ob.parts.forEach(q => { if (!q) return; const y = st.y + (q.x - xc) * Math.sin(st.th), X = xc + (q.x - xc) * Math.cos(st.th); if (q.kind === 'rope') q.l.set([[q.x, 2.2, 0], [X, y + 0.06, 0]]); else if (q.kind === 'spring') q.l.set2([q.x, -1.2, 0], [X, y - 0.06, 0]); else q.l.set2([q.x, 2.2, 0], [X, y + 0.06, 0]); });
     }
   },
@@ -327,8 +333,10 @@ CASES.push({
       T.line('--rope', { pts: [[p.ax, 0, 0], K0] }); T.line('--rope', { pts: [[p.bx, 0, 0], K0] }); T.line('--rope', { pts: [K0, [kx, -p.ky - 0.6, 0]] });
       const b = T.box(0.6, 0.45, 0.6, '--c2'); b.position.set(kx, -p.ky - 0.82, 0);
       const k = 1.6 / Math.max(o.W, o.T1, o.T2), a1 = o.a1 * RAD, a2 = o.a2 * RAD;
-      T.arrow('--c3').set(K0, [-o.T1 * Math.cos(a1) * k, o.T1 * Math.sin(a1) * k, 0]); T.arrow('--c4').set(K0, [o.T2 * Math.cos(a2) * k, o.T2 * Math.sin(a2) * k, 0]);
-      T.label('T₁ ' + fmt(o.T1) + ' N', '--c3', { pos: [K0[0] - o.T1 * Math.cos(a1) * k, K0[1] + o.T1 * Math.sin(a1) * k + 0.2, 0] }); T.label('T₂ ' + fmt(o.T2) + ' N', '--c4', { pos: [K0[0] + o.T2 * Math.cos(a2) * k, K0[1] + o.T2 * Math.sin(a2) * k + 0.2, 0] });
+      const Kf = [K0[0], K0[1], 0.15];
+      T.vec('--c3', '', { r: 0.04 }).set(Kf, [-o.T1 * Math.cos(a1) * k, o.T1 * Math.sin(a1) * k, 0], 'T₁ ' + fmt(o.T1) + ' N');
+      T.vec('--c4', '', { r: 0.04 }).set(Kf, [o.T2 * Math.cos(a2) * k, o.T2 * Math.sin(a2) * k, 0], 'T₂ ' + fmt(o.T2) + ' N');
+      T.vec('--c1', '', { r: 0.04 }).set(Kf, [0, -o.W * k, 0], 'W ' + fmt(o.W) + ' N');
       return {};
     }
   },

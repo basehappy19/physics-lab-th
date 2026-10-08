@@ -22,7 +22,12 @@ function V3(host) {
   this.orb = { r: 10, th: 0.6, ph: 1.1, target: new THREE.Vector3() };
   this._bindControls();
   this.scene = null; this.obj = null; this.labels = [];
+  // ชั้นเวกเตอร์ที่เปิด/ปิดได้: f แรง, v ความเร็ว/ความเร่ง/โมเมนตัม/สนาม, line แนวแรง, val ป้ายค่า
+  this.show = { f: true, v: true, line: false, val: true };
+  try { Object.assign(this.show, JSON.parse(localStorage.getItem('tpat3.vec3d') || '{}')); } catch (e) { }
+  this.kinds = new Set();
 }
+V3.KINDS = [['f', 'แรง'], ['v', 'ความเร็ว/อื่นๆ'], ['line', 'แนวแรง'], ['val', 'ป้ายค่า']];
 const P = V3.prototype;
 
 P._bindControls = function () {
@@ -54,7 +59,7 @@ P._applyCam = function () {
 P.dispose = function () {
   if (!this.scene) return;
   this.scene.traverse(m => { if (m.geometry) m.geometry.dispose(); if (m.material) [].concat(m.material).forEach(x => x.dispose()); });
-  this.labelLayer.innerHTML = ''; this.labels = []; this.scene = null; this.obj = null;
+  this.labelLayer.innerHTML = ''; this.labels = []; this.scene = null; this.obj = null; this.kinds = new Set();
 };
 // สร้างฉากใหม่ keepCam = true เพื่อคงมุมกล้องเดิม
 P.build = function (cs, Pm, o, keepCam) {
@@ -66,24 +71,35 @@ P.build = function (cs, Pm, o, keepCam) {
   sun.shadow.mapSize.set(1024, 1024); const sc = cs.three.shadow || 20;
   Object.assign(sun.shadow.camera, { left: -sc, right: sc, top: sc, bottom: -sc, near: 0.5, far: 200 }); sun.shadow.bias = -0.0005;
   scene.add(sun); this.sun = sun;
+  this.layers = { f: new THREE.Group(), v: new THREE.Group(), line: new THREE.Group() };
+  Object.values(this.layers).forEach(g => scene.add(g));
   const T = this.helpers();
   if (!keepCam || !this._camSet) { const cm = cs.three.cam ? cs.three.cam(Pm, o) : { pos: [6, 5, 10], target: [0, 1, 0] }; this.setCam(cm.pos, cm.target); this._camSet = true; }
   this.T = T;
   this.obj = cs.three.build(T, Pm, o) || {};
 };
 P.resetCam = function () { this._camSet = false; };
+P.toggle = function (k) { this.show[k] = !this.show[k]; try { localStorage.setItem('tpat3.vec3d', JSON.stringify(this.show)); } catch (e) { } };
 P.render = function (st, Pm, o) {
   if (!this.scene) return;
   if (this.cs.three.update) this.cs.three.update(this.obj, st, Pm, o, this.T);
+  const sh = this.show; for (const k in this.layers) this.layers[k].visible = !!sh[k] && (k !== 'line' || !!sh.f);
   this._applyCam();
   this.renderer.render(this.scene, this.camera);
   // ป้ายข้อความ
-  const v = new THREE.Vector3();
+  const v = new THREE.Vector3(), u = new THREE.Vector3();
   this.labels.forEach(l => {
-    if (!l.visible) { l.el.style.display = 'none'; return; }
+    if (!l.visible || (l.kind && (!this.show[l.kind] || !this.show.val || (l.arrow && !l.arrow.visible)))) { l.el.style.display = 'none'; return; }
     v.copy(l.pos).project(this.camera);
     if (v.z > 1) { l.el.style.display = 'none'; return; }
-    l.el.style.display = ''; l.el.style.transform = `translate(-50%,-50%) translate(${(v.x + 1) / 2 * this.w}px,${(1 - v.y) / 2 * this.h}px)`;
+    l.el.style.display = '';
+    let px = (v.x + 1) / 2 * this.w, py = (1 - v.y) / 2 * this.h;
+    if (l.push && l.from) {   // ป้ายของเวกเตอร์: เลื่อนออกไปตามทิศลูกศรบนจอ ไม่ให้บังหัวลูกศร
+      u.copy(l.from).project(this.camera); let dx = px - (u.x + 1) / 2 * this.w, dy = py - (1 - u.y) / 2 * this.h; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+      const bw = l.el.offsetWidth / 2, bh = l.el.offsetHeight / 2, m = 6 + Math.min(bw / Math.max(Math.abs(dx), 1e-3), bh / Math.max(Math.abs(dy), 1e-3));
+      px += dx * m; py += dy * m;
+    }
+    l.el.style.transform = `translate(-50%,-50%) translate(${px}px,${py}px)`;
   });
 };
 
@@ -117,6 +133,25 @@ P.helpers = function () {
         g.position.set(...org); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), V.normalize()); return g;
       };
       return g;
+    },
+    // เวกเตอร์ที่เปิด/ปิดได้จากแถบเครื่องมือ: kind 'f' (แรง ค่าเริ่มต้น) หรือ 'v' (ความเร็ว ความเร่ง ฯลฯ)
+    // v = T.vec('--c1', 'mg', {kind:'f'}); v.set(origin, vec, 'mg = 9.8 N') — ความยาวเป็นหน่วยโลก (m) ให้ผู้เรียกปรับสเกลเอง
+    // แรง (kind 'f') มีเส้นประแสดงแนวแรงด้วย (เปิดด้วยปุ่ม "แนวแรง")
+    vec(c, text, o = {}) {
+      const kind = o.kind || 'f'; self.kinds.add(kind); if (kind === 'f' && o.line !== false) self.kinds.add('line');
+      const a = T.arrow(c, { r: o.r || 0.035, parent: self.layers[kind] }); a.children.forEach(m => { if (o.opacity) { m.material.transparent = true; m.material.opacity = o.opacity; } if (o.top !== false) { m.material.depthTest = false; m.material.transparent = true; m.renderOrder = 10; m.castShadow = false; } });
+      const lab = text != null ? T.label(text, c) : null; if (lab) { lab.kind = kind; lab.arrow = a; lab.el.classList.add('vlab'); }
+      const rr = o.r || 0.035, ln = kind === 'f' && o.line !== false ? T.line(c, { max: 2, dash: rr * 2.5, parent: self.layers.line }) : null; if (ln) { ln.material.depthTest = false; ln.material.transparent = true; ln.renderOrder = 9; }
+      const V = new THREE.Vector3();
+      a.set2 = a.set;
+      a.set = (org, vec, t) => {
+        a.set2(org, vec); V.set(...vec); const L = V.length();
+        if (lab) { const k = o.mid ? 0.5 : o.tail ? 0 : 1; lab.set(t != null ? t : null, [org[0] + vec[0] * k, org[1] + vec[1] * k, org[2] + vec[2] * k]); lab.from = lab.from || new THREE.Vector3(); lab.from.set(org[0] + vec[0] * (o.mid ? 0 : o.tail ? 1 : 0), org[1] + vec[1] * (o.mid ? 0 : o.tail ? 1 : 0), org[2] + vec[2] * (o.mid ? 0 : o.tail ? 1 : 0)); lab.push = !o.mid; }
+        if (ln) { ln.visible = a.visible; if (a.visible) { const e = (o.ext != null ? o.ext : rr * 40) / L; ln.set([[org[0] - vec[0] * e, org[1] - vec[1] * e, org[2] - vec[2] * e], [org[0] + vec[0] * (1 + e), org[1] + vec[1] * (1 + e), org[2] + vec[2] * (1 + e)]]); } }
+        return a;
+      };
+      a.hide = () => { a.visible = false; if (ln) ln.visible = false; return a; };
+      return a;
     },
     // เส้นจากรายการจุด l.set(pts)
     line(c, o = {}) {

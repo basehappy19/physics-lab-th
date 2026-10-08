@@ -51,9 +51,15 @@ CASES.push({
   },
   plot: { overlay: true, yLabel: 'v (m/s)', series: [{ label: 'v₁', unit: 'm/s', c: '--c1', f: s => s.v1 }, { label: 'v₂', unit: 'm/s', c: '--c2', f: s => s.v2 }, { label: 'โมเมนตัมรวม', unit: 'kg·m/s', c: '--muted', f: (s, p) => p.m1 * s.v1 + p.m2 * s.v2 }] },
   three: {
-    cam() { return { pos: [-2, 3, 8], target: [0, 0.3, 0] }; },
-    build(T, p) { const tr = T.box(14, 0.1, 1.2, '--block', { receive: true }); tr.position.y = -0.05; const w1 = 0.5 + 0.25 * Math.cbrt(p.m1), w2 = 0.5 + 0.25 * Math.cbrt(p.m2); const a = T.box(w1, 0.42, 0.6, '--c1'), b = T.box(w2, 0.42, 0.6, '--c2'); return { a, b, la: T.label('', '--c1'), lb: T.label('', '--c2') }; },
-    update(ob, st) { ob.a.position.set(st.x1, 0.33, 0); ob.b.position.set(st.x2, 0.33, 0); ob.la.set(fmt(st.v1) + ' m/s', [st.x1, 0.9, 0]); ob.lb.set(fmt(st.v2) + ' m/s', [st.x2, 0.9, 0]); }
+    cam() { return { pos: [-1, 2.4, 6], target: [0, 0.3, 0] }; },
+    build(T, p) { const tr = T.box(14, 0.1, 1.2, '--block', { receive: true }); tr.position.y = -0.05; const w1 = 0.5 + 0.25 * Math.cbrt(p.m1), w2 = 0.5 + 0.25 * Math.cbrt(p.m2); const a = T.box(w1, 0.42, 0.6, '--c1'), b = T.box(w2, 0.42, 0.6, '--c2'); const o3 = { kind: 'v', r: 0.035, pad: 0.25 }, f3 = { r: 0.035, pad: 0.25 };
+      return { a, b, w1, w2, va: T.vec('--c1', 'v₁', o3), vb: T.vec('--c2', 'v₂', o3), fa: T.vec('--c4', 'F₂₁', f3), fb: T.vec('--c4', 'F₁₂', f3), kv: 1.4 / Math.max(0.5, Math.abs(p.u1), Math.abs(p.u2)) }; },
+    update(ob, st) {
+      ob.a.position.set(st.x1, 0.33, 0); ob.b.position.set(st.x2, 0.33, 0);
+      ob.va.set([st.x1, 0.75, 0], [st.v1 * ob.kv, 0, 0], 'v₁ ' + fmt(st.v1) + ' m/s'); ob.vb.set([st.x2, 0.75, 0], [st.v2 * ob.kv, 0, 0], 'v₂ ' + fmt(st.v2) + ' m/s');
+      // แรงคู่กิริยา-ปฏิกิริยาขณะชน (ขนาดเท่ากัน ทิศตรงข้าม)
+      if (st.hit && st.t - st.th < 0.35) { const xc = (st.x1 + st.x2) / 2; ob.fa.set([xc - 0.02, 0.33, 0.42], [-0.9, 0, 0], 'F₂₁ (รถ 2 ดันรถ 1)'); ob.fb.set([xc + 0.02, 0.33, 0.42], [0.9, 0, 0], 'F₁₂'); } else { ob.fa.hide(); ob.fb.hide(); }
+    }
   },
   notes: ['โมเมนตัมรวมคงที่ทุกค่า e แต่พลังงานจลน์คงที่เฉพาะ e = 1', 'มวลเท่ากัน ชนแบบยืดหยุ่น ความเร็วแลกกัน', 'วัตถุเบาชนวัตถุหนักที่อยู่นิ่ง จะกระดอนกลับเกือบความเร็วเดิม', 'e = 0 เสียพลังงานจลน์มากที่สุด (แต่ไม่จำเป็นต้องเสียทั้งหมด เพราะโมเมนตัมต้องคงที่)']
 });
@@ -107,8 +113,9 @@ CASES.push({
   handles(p, o) { const R = o._c.r1 + o._c.r2; return [{ id: 'b', x: -3.2, y: o._c.by, set: (x, y) => ({ b: clamp(y / R, -0.98, 0.98) }) }]; },
   three: {
     cam() { return { pos: [0.5, 6, 6], target: [1, 0, 0] }; },
-    build(T, p, o) { const t = T.box(10.5, 0.15, 6, '--block', { receive: true }); t.position.set(1.1, -0.075, 0); const c = o._c; const a = T.cyl(c.r1, c.r1, 0.12, '--c1'), b = T.cyl(c.r2, c.r2, 0.12, '--c2'); return { a, b, ta: T.trail('--c1'), tb: T.trail('--c2') }; },
-    update(ob, st) { ob.a.position.set(st.p1[0], 0.06, -st.p1[1]); ob.b.position.set(st.p2[0], 0.06, -st.p2[1]); if (st.t === 0) { ob.ta.clear(); ob.tb.clear(); } ob.ta.push([st.p1[0], 0.01, -st.p1[1]]); ob.tb.push([st.p2[0], 0.01, -st.p2[1]]); }
+    build(T, p, o) { const t = T.box(10.5, 0.15, 6, '--block', { receive: true }); t.position.set(1.1, -0.075, 0); const c = o._c; const a = T.cyl(c.r1, c.r1, 0.12, '--c1'), b = T.cyl(c.r2, c.r2, 0.12, '--c2'); const o3 = { kind: 'v', r: 0.035, pad: 0.25 }; return { a, b, ta: T.trail('--c1'), tb: T.trail('--c2'), va: T.vec('--c1', 'v₁', o3), vb: T.vec('--c2', 'v₂', o3) }; },
+    update(ob, st) {
+      [[ob.va, st.p1, st.v1, 'v₁'], [ob.vb, st.p2, st.v2, 'v₂']].forEach(([a, q, v, n]) => { const s = Math.hypot(...v); if (s > 0.01) a.set([q[0], 0.2, -q[1]], [v[0] * 0.5, 0, -v[1] * 0.5], n + ' ' + fmt(s) + ' m/s'); else a.hide(); }); ob.a.position.set(st.p1[0], 0.06, -st.p1[1]); ob.b.position.set(st.p2[0], 0.06, -st.p2[1]); if (st.t === 0) { ob.ta.clear(); ob.tb.clear(); } ob.ta.push([st.p1[0], 0.01, -st.p1[1]]); ob.tb.push([st.p2[0], 0.01, -st.p2[1]]); }
   },
   notes: ['b = 0 คือการชนตรงศูนย์ กลายเป็นการชน 1 มิติ', 'มวลเท่ากันและยืดหยุ่นสมบูรณ์ ทั้งสองแยกกันเป็นมุม 90° เสมอ (ยกเว้นชนตรงศูนย์)', 'ผลรวมเวกเตอร์ p₁′ + p₂′ (เส้นประ) เท่ากับ p ก่อนชนพอดี', 'ลากพัค 1 ขึ้นลงเพื่อเปลี่ยนระยะเยื้องศูนย์']
 });
@@ -187,8 +194,12 @@ CASES.push({
   },
   three: {
     cam(p) { return { pos: [2.5, 0, 3.5], target: [0, -p.L * 0.7, 0] }; },
-    build(T, p) { const top = T.box(1.6, 0.06, 0.4, '--ink'); const rope = T.line('--rope', { max: 2 }), rope2 = T.line('--rope', { max: 2 }); const blk = T.box(0.4, 0.26, 0.3, '--block2'); const bul = T.cyl(0.02, 0.02, 0.1, '--c1'); bul.rotation.z = Math.PI / 2; return { rope, rope2, blk, bul }; },
-    update(ob, st, p) { const bx = p.L * Math.sin(st.th), by = -p.L * Math.cos(st.th); ob.rope.set([[-0.15, 0, 0], [bx - 0.15, by, 0]]); ob.rope2.set([[0.15, 0, 0], [bx + 0.15, by, 0]]); ob.blk.position.set(bx, by - 0.13, 0); ob.blk.rotation.z = st.th; ob.bul.visible = !st.hit; ob.bul.position.set(st.bx, -p.L - 0.12, 0); }
+    build(T, p) { const top = T.box(1.6, 0.06, 0.4, '--ink'); const rope = T.line('--rope', { max: 2 }), rope2 = T.line('--rope', { max: 2 }); const blk = T.box(0.4, 0.26, 0.3, '--block2'); const bul = T.cyl(0.02, 0.02, 0.1, '--c1'); bul.rotation.z = Math.PI / 2; const o3 = { r: 0.015, pad: 0.1 };
+      return { rope, rope2, blk, bul, aT: T.vec('--c3', 'T', o3), aW: T.vec('--c1', '(m+M)g', o3), aV: T.vec('--c2', 'V', Object.assign({ kind: 'v' }, o3)), aB: T.vec('--c1', 'v กระสุน', Object.assign({ kind: 'v' }, o3)) }; },
+    update(ob, st, p, o) {
+      { const M = p.m / 1000 + p.M, W = M * 9.8, k = 0.45 / W, bx = p.L * Math.sin(st.th), by = -p.L * Math.cos(st.th) - 0.13, s = Math.sin(st.th), c = Math.cos(st.th), Pz = [bx, by, 0.2];
+        if (st.hit) { const Tn = M * (9.8 * c + p.L * st.w * st.w); ob.aT.set(Pz, [-s * Tn * k, c * Tn * k, 0], 'T ' + fmt(Tn) + ' N'); ob.aW.set(Pz, [0, -W * k, 0], '(m+M)g ' + fmt(W) + ' N'); const V = p.L * st.w; if (Math.abs(V) > 0.01) ob.aV.set(Pz, [c * V * 0.4, s * V * 0.4, 0], 'V ' + fmt(Math.abs(V)) + ' m/s'); else ob.aV.hide(); ob.aB.hide(); }
+        else { ob.aT.set(Pz, [0, 0.45, 0], 'T = Mg'); ob.aW.set(Pz, [0, -0.45 * p.M / M, 0], 'Mg'); ob.aV.hide(); ob.aB.set([st.bx, -p.L - 0.12, 0], [0.5, 0, 0], 'v ' + fmt(p.v) + ' m/s'); } } const bx = p.L * Math.sin(st.th), by = -p.L * Math.cos(st.th); ob.rope.set([[-0.15, 0, 0], [bx - 0.15, by, 0]]); ob.rope2.set([[0.15, 0, 0], [bx + 0.15, by, 0]]); ob.blk.position.set(bx, by - 0.13, 0); ob.blk.rotation.z = st.th; ob.bul.visible = !st.hit; ob.bul.position.set(st.bx, -p.L - 0.12, 0); }
   },
   notes: ['ช่วงชนเป็นการชนไม่ยืดหยุ่น พลังงานจลน์ส่วนใหญ่กลายเป็นความร้อนและเสียง ห้ามใช้อนุรักษ์พลังงานข้ามช่วงชน', 'ไม้หนักขึ้น ความเร็วหลังชนลดลง ไม้จึงขึ้นได้ต่ำลง', 'ความยาวเชือกไม่มีผลต่อความสูงที่ขึ้นได้ แต่มีผลต่อมุม']
 });
