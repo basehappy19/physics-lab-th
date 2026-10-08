@@ -74,37 +74,61 @@ const Lab = (function () {
   const deepCopy = v => JSON.parse(JSON.stringify(v));
 
   function setHash() {
-    const h = si < 0 ? '#home' : '#' + chapters[si].id + '.' + ci;
+    const h = si === -2 ? '#start' : si < 0 ? '#home' : '#' + chapters[si].id + '.' + ci;
     try { history.replaceState(null, '', h); } catch (e) { /* ไม่เป็นไร */ }
   }
 
   // เลื่อนแถบแนวนอนให้เห็นปุ่มที่เลือก โดยไม่เลื่อนหน้าขึ้นลง
   const hscroll = (box, el) => { const l = el.offsetLeft - box.offsetLeft, r = l + el.offsetWidth; if (l < box.scrollLeft) box.scrollLeft = l - 20; else if (r > box.scrollLeft + box.clientWidth) box.scrollLeft = r - box.clientWidth + 20; };
 
+  // ไอคอนเส้นเรียบ (svg) ของแต่ละบท กำหนดใน chapters.js ผ่าน Lab.icons
+  const icon = (id, sz = 22) => { const d = (Lab.icons || {})[id]; return d ? `<svg class="ic" width="${sz}" height="${sz}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>` : ''; };
+  const showPage = which => { $('#landing').hidden = which !== 'landing'; $('#homeGrid').hidden = which !== 'toc'; $('#lab').hidden = which !== 'lab'; $('#hdr').hidden = which === 'landing'; };
+  const FEATURED = [['equil', 'คานแก้ไขได้', 'วางน้ำหนัก จุดรองรับ เชือก สปริง แล้วดูแรงทุกตัว'], ['newton', 'พื้นเอียง', 'ลากมุมและกล่องได้ ดูแรงเสียดทานสถิตกับจลน์'], ['proj', 'ยิงโพรเจกไทล์', 'เล็ง ย้ายเป้า เก็บรอยทางเทียบหลายนัด'], ['energy', 'รางเลื่อนแก้ไขได้', 'ปั้นรางเอง ดูพลังงานเปลี่ยนรูป'], ['elec', 'สนามและศักย์ไฟฟ้า', 'ลากประจุ ดูเส้นสนามและพื้นผิวศักย์ 3D'], ['env', 'แผงโซลาร์เซลล์', 'ดวงอาทิตย์เคลื่อนที่ทั้งวัน 3D']];
+  function goLanding() {
+    si = -2; ci = -1; cur = null; playing = false; showPage('landing');
+    $('#foot').textContent = '';
+    const nCase = chapters.reduce((a, c) => a + c.cases.length, 0), n3 = chapters.reduce((a, c) => a + c.cases.filter(x => x.three).length, 0);
+    const find = (cid, nm) => { const c = chap(cid); const k = c ? c.cases.findIndex(x => x.name === nm) : -1; return k >= 0 ? `#${cid}.${k}` : `#${cid}.0`; };
+    $('#landing').innerHTML = `<section class="hero"><p class="eyebrow">${icon('general', 18)} TPAT3 · ฟิสิกส์</p><h1>ห้องทดลองฟิสิกส์ TPAT3</h1>
+      <p class="lead">แบบจำลองโต้ตอบครบทุกบทของ TPAT3 ปรับค่าตามโจทย์ ลากย้ายวัตถุ เพิ่มหรือลบชิ้นส่วน แล้วดูผลทันทีผ่านแอนิเมชัน กราฟ และภาพ 3D</p>
+      <div class="cta"><a class="b1" href="#home">${icon('toc', 18)}ดูสารบัญทั้งหมด</a><button class="b2" id="rand">${icon('dice', 18)}สุ่มแบบจำลอง</button></div>
+      <p class="stats"><b>${chapters.length}</b> บท · <b>${nCase}</b> แบบจำลอง · <b>${n3}</b> แบบมีมุมมอง 3D</p></section>
+      <section><h2 class="sec">เลือกบท</h2><div class="chapgrid">${chapters.map(c => `<a class="cbtn" href="#${c.id}.0"><span class="icbox">${icon(c.id, 26)}</span><span class="t"><span class="no">บทที่ ${c.no}</span><span class="nm">${c.short || c.name}</span></span><span class="ct">${c.cases.length}</span></a>`).join('')}</div></section>
+      <section><h2 class="sec">แนะนำให้ลอง</h2><div class="feat">${FEATURED.map(([cid, nm, d]) => `<a class="fcard" href="${find(cid, nm)}"><span class="icbox">${icon(cid, 22)}</span><span><b>${nm}</b><span class="d">${d}</span></span></a>`).join('')}</div></section>
+      <section><h2 class="sec">ใช้งานอย่างไร</h2><div class="tips">
+        <div>${icon('drag', 22)}<p><b>ลากวัตถุในภาพ</b>จุดวงกลมประคือสิ่งที่ลากได้ เช่น กล่อง น้ำหนัก เป้า ประจุ</p></div>
+        <div>${icon('sliders', 22)}<p><b>ปรับค่าตามโจทย์</b>เลื่อนแถบหรือพิมพ์ตัวเลขในช่อง เพิ่มหรือลบชิ้นส่วนได้</p></div>
+        <div>${icon('play', 22)}<p><b>เล่นแอนิเมชัน</b>กด ▶ หรือ Space ปรับความเร็วได้ ดูกราฟสดด้านล่าง</p></div>
+        <div>${icon('cube', 22)}<p><b>ดูแบบ 3D</b>กดปุ่ม 3D ลากเพื่อหมุน ล้อเมาส์เพื่อซูม</p></div></div></section>
+      <section class="creator"><span class="icbox">${icon('heart', 22)}</span><p>สร้างโดย <a href="https://www.instagram.com/base_happy19/" target="_blank" rel="noopener">IG: base_happy19</a><span class="d">ใช้สอนและทบทวนได้ฟรี แบบจำลองเป็นการคำนวณโดยประมาณเพื่อการเรียนรู้</span></p></section>`;
+    $('#rand').onclick = () => { const all = []; chapters.forEach((c, i) => c.cases.forEach((x, k) => all.push([i, k]))); const [a, b] = all[Math.floor(Math.random() * all.length)]; go(a, b); };
+    buildNav(); setHash(); window.scrollTo(0, 0);
+  }
+
   // ---------- เมนูบท ----------
   function buildNav() {
-    $('#subjects').innerHTML = `<button role="tab" aria-selected="${si < 0}" data-s="-1">สารบัญ</button>` +
-      chapters.map((c, i) => `<button role="tab" aria-selected="${i === si}" data-s="${i}" ${c.cases.length ? '' : 'class="empty"'}><span class="no">${c.no}</span>${c.short || c.name}</button>`).join('');
-    $('#subjects').onclick = e => { const b = e.target.closest('button'); if (b) { const k = +b.dataset.s; k < 0 ? goHome() : selectSubject(k, 0); } };
+    $('#subjects').innerHTML = `<button role="tab" aria-selected="${si === -2}" data-s="-2">${icon('start', 16)}หน้าแรก</button><button role="tab" aria-selected="${si === -1}" data-s="-1">${icon('toc', 16)}สารบัญ</button>` +
+      chapters.map((c, i) => `<button role="tab" aria-selected="${i === si}" data-s="${i}" ${c.cases.length ? '' : 'class="empty"'}>${icon(c.id, 16)}<span class="no">${c.no}</span>${c.short || c.name}</button>`).join('');
+    $('#subjects').onclick = e => { const b = e.target.closest('button'); if (b) { const k = +b.dataset.s; go(k, 0); } };
     const on = $('#subjects [aria-selected="true"]'); if (on) hscroll($('#subjects'), on);
   }
   function goHome() {
-    si = -1; ci = -1; cur = null; playing = false;
-    $('#lab').hidden = true; $('#homeGrid').hidden = false;
+    si = -1; ci = -1; cur = null; playing = false; showPage('toc');
     $('#siteH1').textContent = 'สารบัญแบบจำลอง';
     $('#subjDesc').textContent = 'แบบจำลองโต้ตอบครบ 15 บทตามเนื้อหา TPAT3 ปรับค่าได้ละเอียด ลากย้ายวัตถุ เพิ่มหรือลบชิ้นส่วน ดูแอนิเมชันและกราฟสด ทั้ง 2D และ 3D';
     $('#foot').textContent = '';
-    $('#homeGrid').innerHTML = chapters.map((c, i) => `<article class="chap"><a class="chap-h" href="#${c.id}.0" data-s="${i}"><span class="no">บทที่ ${c.no}</span><span class="nm">${c.name}</span><span class="ct">${c.cases.length} แบบจำลอง</span></a>` +
+    $('#homeGrid').innerHTML = chapters.map((c, i) => `<article class="chap"><a class="chap-h" href="#${c.id}.0" data-s="${i}"><span class="icbox">${icon(c.id, 24)}</span><span class="no">บทที่ ${c.no}</span><span class="nm">${c.name}</span><span class="ct">${c.cases.length} แบบจำลอง · ${c.blurb || ''}</span></a>` +
       `<div class="chips">${c.cases.map((cs, k) => `<a href="#${c.id}.${k}">${cs.name}${cs.three ? '<span class="d3">3D</span>' : ''}</a>`).join('')}</div></article>`).join('');
     buildNav(); setHash();
   }
   function selectSubject(i, j) {
     si = i; const s = chapters[i];
-    $('#homeGrid').hidden = true; $('#lab').hidden = false;
+    showPage('lab');
     $('#siteH1').textContent = `บทที่ ${s.no} · ${s.name}`;
     $('#subjDesc').textContent = s.blurb || '';
     buildNav();
-    if (!s.cases.length) { $('#tabs').innerHTML = ''; $('#lab').hidden = true; $('#homeGrid').hidden = false; $('#homeGrid').innerHTML = '<p class="hint">บทนี้ยังไม่มีแบบจำลอง</p>'; return; }
+    if (!s.cases.length) { $('#tabs').innerHTML = ''; showPage('toc'); $('#homeGrid').innerHTML = '<p class="hint">บทนี้ยังไม่มีแบบจำลอง</p>'; return; }
     selectCase(clamp(j || 0, 0, s.cases.length - 1));
   }
   function buildCaseTabs() {
@@ -363,10 +387,11 @@ const Lab = (function () {
 
   function fromHash() {
     const m = /^#([A-Za-z0-9_~-]+)(?:\.(\d+))?$/.exec(location.hash || '');
-    if (!m || m[1] === 'home') return [-1, 0];
-    const k = chapters.findIndex(s => s.id === m[1]); return k >= 0 ? [k, +(m[2] || 0)] : [-1, 0];
+    if (!m || m[1] === 'start') return [-2, 0];
+    if (m[1] === 'home') return [-1, 0];
+    const k = chapters.findIndex(s => s.id === m[1]); return k >= 0 ? [k, +(m[2] || 0)] : [-2, 0];
   }
-  function go(i, j) { if (i < 0) goHome(); else selectSubject(i, j); }
+  function go(i, j) { if (i === -2) goLanding(); else if (i < 0) goHome(); else selectSubject(i, j); window.scrollTo(0, 0); }
   function start() {
     G = new Lab.G2($('#cv'));
     GR = Lab.Graph ? new Lab.Graph($('#gcv')) : null;

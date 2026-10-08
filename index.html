@@ -5,18 +5,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ห้องทดลองฟิสิกส์ TPAT3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div class="wrap">
-  <header>
+  <header id="hdr">
     <p class="site-title">ห้องทดลองฟิสิกส์ TPAT3</p>
     <h1 id="siteH1">ห้องทดลองฟิสิกส์ TPAT3</h1>
     <p id="subjDesc"></p>
   </header>
   <nav class="subjects" role="tablist" id="subjects" aria-label="บท"></nav>
-  <main class="home" id="homeGrid"></main>
+  <div id="landing" hidden></div>
+  <main class="home" id="homeGrid" hidden></main>
   <div id="lab" hidden>
     <div class="tabs" role="tablist" id="tabs" aria-label="แบบจำลอง"></div>
     <section class="card case-head" id="head" style="margin-top:12px"></section>
@@ -43,7 +44,7 @@
     </div>
   </div>
   <footer id="foot"></footer>
-  <div class="btns"><button class="btn" id="themebtn">สลับโหมดมืด/สว่าง</button></div>
+  <div class="credit-row"><div class="btns"><button class="btn" id="themebtn">สลับโหมดมืด/สว่าง</button></div><p class="credit">สร้างโดย <a href="https://www.instagram.com/base_happy19/" target="_blank" rel="noopener">IG: base_happy19</a></p></div>
 </div>
 <script src="vendor/three.min.js"></script>
 <script src="js/engine.js"></script>

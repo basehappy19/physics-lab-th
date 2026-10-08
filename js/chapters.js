@@ -16,3 +16,30 @@
   ['general', 14, 'ฟิสิกส์และวิทยาศาสตร์ทั่วไป', 'ฟิสิกส์ทั่วไป', 'คลื่น เสียง แสง ทัศนอุปกรณ์ ฟิสิกส์นิวเคลียร์ ฟิสิกส์ควอนตัมเบื้องต้น และสัมพัทธภาพพิเศษ', ''],
   ['env', 15, 'ความรู้ทั่วไป พลังงาน และสิ่งแวดล้อม', 'พลังงาน สิ่งแวดล้อม', 'พลังงานทดแทน การใช้ไฟฟ้าในบ้าน ภาวะเรือนกระจก และประสิทธิภาพการแปลงพลังงาน', 'ค่าตั้งต้น เช่น อัตราค่าไฟและค่าการปล่อยคาร์บอน เป็นค่าประมาณ ปรับให้ตรงกับข้อมูลปัจจุบันได้']
 ].forEach(([id, no, name, short, blurb, footer]) => Lab.chapter({ id, no, name, short, blurb, footer }));
+
+/* ไอคอนเส้นเรียบของแต่ละบท (viewBox 24×24 ใช้สีตามข้อความ) */
+Lab.icons = {
+  sci: '<rect x="2.5" y="7" width="19" height="6" rx="1.5"/><path d="M6 7v3M9.5 7v2M13 7v3M16.5 7v2"/><path d="M5 13v6h4v-6"/>',
+  kin: '<path d="M2.5 8.5h7M2.5 12h10M2.5 15.5h7"/><path d="M15 6.5l5.5 5.5-5.5 5.5"/>',
+  newton: '<path d="M2.5 20h19"/><rect x="4" y="9" width="8" height="8" rx="1.5"/><path d="M12 13h8.5M17.5 10l3 3-3 3"/>',
+  equil: '<path d="M12 4v16M8 20h8M4.5 7.5h15"/><path d="M4.5 7.5L2 13h5zM19.5 7.5L17 13h5z"/><circle cx="12" cy="4" r="1"/>',
+  energy: '<path d="M13.5 2.5L5 13.5h6.5l-1 8 8.5-11h-6.5z"/>',
+  momentum: '<circle cx="8" cy="12" r="3.5"/><circle cx="17.5" cy="12" r="3.5"/><path d="M1.5 9.5h2M1 12h2.5M1.5 14.5h2"/>',
+  proj: '<path d="M2.5 20h19"/><path d="M3.5 19.5C6 7 15 6 20.5 19.5" stroke-dasharray="2 2.4"/><circle cx="12" cy="9.6" r="2"/>',
+  circ: '<circle cx="12" cy="12" r="2.2"/><path d="M20 12a8 8 0 1 1-2.35-5.65"/><path d="M18.2 2.8v3.8h-3.8"/>',
+  shm: '<path d="M2 12c1.6-5 3.4-5 5 0s3.4 5 5 0 3.4-5 5 0 3.4 5 5 0"/>',
+  elec: '<path d="M9 2.5v5M15 2.5v5"/><path d="M6 7.5h12v3.5a6 6 0 0 1-12 0z"/><path d="M12 17v4.5"/>',
+  thermo: '<path d="M10 13.5V5a2 2 0 0 1 4 0v8.5a4 4 0 1 1-4 0z"/><path d="M12 9v7.5"/>',
+  solid: '<path d="M12 2.5l8.5 4.75v9.5L12 21.5l-8.5-4.75v-9.5z"/><path d="M12 21.5V12M20.5 7.25L12 12 3.5 7.25"/>',
+  fluid: '<path d="M12 3s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10 12 3 12 3z"/><path d="M9 15a3 3 0 0 0 3 3"/>',
+  general: '<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="9.5" ry="3.8" transform="rotate(120 12 12)"/>',
+  env: '<path d="M5 19.5C5 10 10.5 4.5 20 4.5c0 9.5-5.5 15-15 15z"/><path d="M5 19.5l8.5-8.5"/>',
+  start: '<path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/>',
+  toc: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
+  dice: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.2"/><circle cx="15.5" cy="15.5" r="1.2"/><circle cx="12" cy="12" r="1.2"/>',
+  drag: '<path d="M12 2.5v19M2.5 12h19"/><path d="M9 5.5l3-3 3 3M9 18.5l3 3 3-3M5.5 9l-3 3 3 3M18.5 9l3 3-3 3"/>',
+  sliders: '<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="15" cy="12" r="2" fill="currentColor"/><circle cx="7" cy="18" r="2" fill="currentColor"/>',
+  play: '<circle cx="12" cy="12" r="9.5"/><path d="M10 8.5v7l6-3.5z"/>',
+  cube: '<path d="M12 2.5l8.5 4.75v9.5L12 21.5l-8.5-4.75v-9.5z"/><path d="M12 21.5V12M20.5 7.25L12 12 3.5 7.25"/>',
+  heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.4 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>'
+};

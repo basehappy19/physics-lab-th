@@ -1,5 +1,7 @@
 # ห้องทดลองฟิสิกส์ TPAT3
 
+สร้างโดย [IG: base_happy19](https://www.instagram.com/base_happy19/)
+
 เว็บแบบจำลองฟิสิกส์แบบโต้ตอบ ครบ 15 บทตามเนื้อหา TPAT3 (83 แบบจำลอง) สำหรับสอน ทบทวน และลองโจทย์เอง
 
 - **แอนิเมชัน** เล่น/หยุด/เริ่มใหม่ ปรับความเร็วได้ 0.1×–4× (กด Space เพื่อเล่น/หยุด)
@@ -110,5 +112,6 @@ git commit -m "เริ่มต้นโปรเจกต์ ห้องท�
 
 ## เครดิต
 
+- ผู้สร้าง: **IG: base_happy19** — [instagram.com/base_happy19](https://www.instagram.com/base_happy19/)
 - three.js © three.js authors, MIT License (`vendor/three.LICENSE`)
 - หัวข้อบทเรียงตามสารบัญเอกสารติว TPAT3 ของ SmartMathPro × Physics Farm แบบจำลองและคำอธิบายในโปรเจกต์นี้เขียนขึ้นเอง ไม่ได้คัดลอกเนื้อหาเอกสารต้นฉบับ
