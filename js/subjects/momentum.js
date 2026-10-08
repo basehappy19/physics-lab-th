@@ -158,6 +158,20 @@ CASES.push({
     }
   },
   plot: { dt: 1 / 2000, series: [{ label: 'แรงที่ผนังกระทำ', unit: 'N', c: '--c4', f: s => -s.F }, { label: 'โมเมนตัม', unit: 'kg·m/s', c: '--c1', f: (s, p) => p.m * s.v }] },
+  three: {
+    cam() { return { pos: [-1.6, 0.9, 2.6], target: [-1.1, 0.25, 0] }; },
+    build(T, p, o) {
+      T.floor(6, { step: 0.25 }).position.x = -1.3; const wall = T.box(0.15, 1.1, 1.2, p.dt > 0.05 ? '--c4' : '--ground'); wall.position.set(0.075, 0.55, 0);
+      const o3 = { r: 0.014, pad: 0.08 };
+      return { ball: T.sphere(0.15, '--c1'), aV: T.vec('--c1', 'v', Object.assign({ kind: 'v' }, o3)), aF: T.vec('--c4', 'F', o3), kF: 0.9 / Math.max(o.Fmax, 1e-9), kv: 0.5 / Math.max(p.u, 1e-9) };
+    },
+    update(ob, st, p) {
+      const R = 0.15, sq = (st.squash || 0) * Math.min(0.5, p.dt * 4 + 0.15), touching = st.tc !== null && !st.after;
+      ob.ball.position.set(st.x + (touching ? R * sq * 0.5 : 0), R * (1 + sq * 0.6), 0); ob.ball.scale.set(1 - sq, 1 + sq * 0.6, 1 + sq * 0.3);
+      (Math.abs(st.v) > 0.01 && (st.tc === null || st.after)) ? ob.aV.set([st.x, R * 2.3, 0], [st.v * ob.kv, 0, 0], 'v ' + fmt(st.v) + ' m/s') : ob.aV.hide();
+      st.F ? ob.aF.set([-0.01, R, 0.2], [st.F * ob.kF, 0, 0], 'F ' + fmt(-st.F) + ' N') : ob.aF.hide();
+    }
+  },
   notes: ['การดลเท่ากันถ้าความเร็วก่อนและหลังเท่าเดิม แต่ถ้า Δt ยาวขึ้น แรงสูงสุดจะต่ำลงมาก (หมอน ถุงลม หมวกกันน็อก)', 'กระดอนกลับ (e > 0) Δp มากกว่าหยุดนิ่ง แรงจึงมากกว่า', 'พื้นที่ใต้กราฟแรง-เวลาคือการดล ไม่ว่ารูปร่างกราฟจะเป็นอย่างไร', 'ปรับความเร็วเล่นเป็น 0.1× เพื่อดูช่วงสัมผัสชัดๆ']
 });
 

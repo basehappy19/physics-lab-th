@@ -161,6 +161,26 @@ CASES.push({
     }
   },
   plot: { series: [{ label: 'x', unit: 'm', c: '--c1', f: (s, p, o) => p.A * Math.sin(o.w * s.t + p.phi * RAD) }, { label: 'v', unit: 'm/s', c: '--c2', f: (s, p, o) => p.A * o.w * Math.cos(o.w * s.t + p.phi * RAD) }, { label: 'a', unit: 'm/s²', c: '--c3', f: (s, p, o) => -p.A * o.w * o.w * Math.sin(o.w * s.t + p.phi * RAD) }] },
+  three: {
+    cam(p) { return { pos: [p.A * 3.2, p.A * 1.6, p.A * 3.4], target: [p.A * 0.7, 0, -p.A * 1.2] }; },
+    build(T, p) {
+      const A = p.A, ring = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * 2 * Math.PI; ring.push([A * Math.cos(a), A * Math.sin(a), 0]); }
+      T.line('--line', { pts: ring, max: 97 }); T.line('--muted', { pts: [[-A * 1.2, 0, 0], [A * 1.2, 0, 0]] });
+      const rod = T.cyl(A * 0.01, A * 0.01, A * 2.4, '--ink'); rod.position.x = A * 1.5;
+      const wall = T.box(0.002, A * 2.6, A * 4.2, '--panel', { opacity: 0.35, cast: false }); wall.position.set(A * 1.52, 0, -A * 2.1);
+      T.label('เส้นทางเป็นเกลียวเมื่อเวลาเดินไปทางลึก', '--muted', { pos: [0, -A * 1.35, -A * 2] }); T.label('เงาบนผนัง = กราฟไซน์', '--c1', { pos: [A * 1.55, A * 1.35, -A * 2.6] });
+      const o3 = { kind: 'v', r: A * 0.012, pad: A * 0.1 };
+      return { A, rad: T.line('--c4', { max: 2 }), pt: T.sphere(A * 0.05, '--c4'), sh: T.sphere(A * 0.06, '--c1'), proj: T.line('--muted', { max: 2, dash: A * 0.04 }), helix: T.line('--c4', { max: 241, opacity: 0.6 }), sine: T.line('--c1', { max: 241 }), v: T.vec('--c2', 'v', o3), vc: T.vec('--c4', 'Aω', Object.assign({ opacity: 0.5 }, o3)) };
+    },
+    update(ob, st, p, o) {
+      const A = ob.A, tNow = st.t || 0, ph = o.w * tNow + p.phi * RAD, x = A * Math.cos(ph), y = A * Math.sin(ph), sc = A * 3.6 / (2 * o.T);
+      ob.rad.set([[0, 0, 0], [x, y, 0]]); ob.pt.position.set(x, y, 0); ob.sh.position.set(A * 1.5, y, 0); ob.proj.set([[x, y, 0], [A * 1.5, y, 0]]);
+      const H = [], S = []; for (let i = 0; i <= 240; i++) { const t = tNow - i * 2 * o.T / 240; if (t < 0) break; const q = o.w * t + p.phi * RAD; H.push([A * Math.cos(q), A * Math.sin(q), -(tNow - t) * sc]); S.push([A * 1.52, A * Math.sin(q), -(tNow - t) * sc]); }
+      ob.helix.set(H); ob.sine.set(S);
+      const k = 0.5 / o.w; ob.vc.set([x, y, 0], [-A * o.w * Math.sin(ph) * k, A * o.w * Math.cos(ph) * k, 0], 'Aω');
+      const vy = A * o.w * Math.cos(ph); Math.abs(vy) > 1e-6 ? ob.v.set([A * 1.5, y, 0], [0, vy * k, 0], 'v ' + fmt(vy) + ' m/s') : ob.v.hide();
+    }
+  },
   notes: ['ความเร็วของเงาเท่ากับองค์ประกอบแนวดิ่งของความเร็วจุดบนวงกลม (Aω cos)', 'v นำหน้า x อยู่ 90° และ a นำหน้า x อยู่ 180° (ตรงข้ามกัน)', 'มุมเฟส φ บอกว่าเริ่มที่ตำแหน่งใดของรอบ']
 });
 
@@ -193,6 +213,27 @@ CASES.push({
     }
   },
   plot: { series: [{ label: 'x', unit: 'm', c: '--c2', f: s => s.x }] },
+  three: {
+    cam() { return { pos: [0.1, 0.6, 1.5], target: [-0.1, 0.1, 0] }; },
+    build(T, p) {
+      T.floor(3, { step: 0.1 }); const w = T.box(0.05, 0.6, 0.5, '--ground'); w.position.set(-0.975, 0.3, 0);
+      const ob = { blk: T.box(0.18, 0.18, 0.18, '--c2') };
+      if (p.cfg === 'one') ob.s1 = T.spring('--spring', { coils: 12, r: 0.035 });
+      else if (p.cfg === 'ser') { ob.s1 = T.spring('--c1', { coils: 8, r: 0.035 }); ob.s2 = T.spring('--c3', { coils: 8, r: 0.035 }); ob.mid = T.sphere(0.015, '--ink'); }
+      else { ob.s1 = T.spring('--c1', { coils: 10, r: 0.025 }); ob.s2 = T.spring('--c3', { coils: 10, r: 0.025 }); }
+      const o3 = { r: 0.007, pad: 0.05 }; ob.aF = T.vec('--c4', 'F = −kx', o3); ob.aV = T.vec('--c1', 'v', Object.assign({ kind: 'v' }, o3)); ob.l1 = T.label('k₁', '--c1'); ob.l2 = T.label('k₂', '--c3');
+      return ob;
+    },
+    update(ob, st, p, o) {
+      const s = 0.18, X = 0.25 + st.x, y = s / 2; ob.blk.position.set(X, y, 0);
+      if (p.cfg === 'one') { ob.s1.set2([-0.95, y, 0], [X - s / 2, y, 0]); ob.l1.visible = ob.l2.visible = false; }
+      else if (p.cfg === 'ser') { const mid = -0.95 + (X - s / 2 + 0.95) * (p.k2 / (p.k1 + p.k2)); ob.s1.set2([-0.95, y, 0], [mid, y, 0]); ob.s2.set2([mid, y, 0], [X - s / 2, y, 0]); ob.mid.position.set(mid, y, 0); ob.l1.set(null, [(-0.95 + mid) / 2, y + 0.09, 0]); ob.l2.set(null, [(mid + X - s / 2) / 2, y + 0.09, 0]); }
+      else { ob.s1.set2([-0.95, y, 0.045], [X - s / 2, y, 0.045]); ob.s2.set2([-0.95, y, -0.045], [X - s / 2, y, -0.045]); ob.l1.set(null, [-0.5, y + 0.08, 0.05]); ob.l2.set(null, [-0.5, y + 0.08, -0.05]); }
+      const F = -o.k * st.x, kF = 0.3 / Math.max(1e-9, o.k * Math.abs(p.A));
+      Math.abs(F) > 1e-6 ? ob.aF.set([X, y, s / 2 + 0.01], [F * kF, 0, 0], 'F = −kx = ' + fmt(F) + ' N') : ob.aF.hide();
+      Math.abs(st.v) > 1e-3 ? ob.aV.set([X, s + 0.06, 0], [st.v * 0.25 / Math.max(1e-6, Math.abs(p.A) * Math.sqrt(o.k / p.m)), 0, 0], 'v ' + fmt(st.v) + ' m/s') : ob.aV.hide();
+    }
+  },
   notes: ['ต่ออนุกรม สปริงรวมอ่อนลง (k น้อยลง) คาบยาวขึ้น', 'ต่อขนาน สปริงรวมแข็งขึ้น คาบสั้นลง', 'สปริงเหมือนกันสองตัว อนุกรมได้ k/2 ขนานได้ 2k คาบต่างกัน 2 เท่า', 'ต่ออนุกรม สปริงแต่ละตัวรับแรงเท่ากัน ตัวที่ k น้อยยืดมากกว่า']
 });
 

@@ -4,6 +4,18 @@
 const { fmt, clamp, RAD, DEG, T, L, PL, ARW, DOT, midArrow } = Lab.h;
 const CASES = [];
 const REAL = 'จริง', VIRT = 'เสมือน';
+// ---- ตัวช่วย 3D (หน่วย cm → 0.05 หน่วยโลก) ----
+const OS = 0.05;
+const arrow3d = (T, x, h, c, op) => { const g = T.group(), H = Math.abs(h), sh = T.cyl(0.025, 0.025, Math.max(0.01, H - 0.12), c, { parent: g, opacity: op }); sh.position.y = (H - 0.12) / 2; const hd = T.mesh(new T.THREE.ConeGeometry(0.07, 0.14, 16), c, { parent: g, opacity: op }); hd.position.y = H - 0.07; g.position.x = x; if (h < 0) g.rotation.x = Math.PI; return g; };
+const seg3d = (T, a, b, c, o = {}) => T.line(c, Object.assign({ pts: [[a[0], a[1], 0], [b[0], b[1], 0]] }, o));
+// รังสีหลัก: จากยอดวัตถุ ผ่านจุดบนเลนส์/กระจก แล้วผ่าน (หรือเสมือนผ่าน) ยอดภาพ
+const rays3d = (T, O, I, pts, xEnd, dirSign, cols) => pts.forEach((M, i) => {
+  const c = cols[i % cols.length]; seg3d(T, O, M, c);
+  if (!isFinite(I[0]) || !isFinite(I[1])) { const d = dirSign > 0 ? [-O[0], -O[1]] : [O[0], -O[1]], L = Math.hypot(...d) || 1; seg3d(T, M, [M[0] + d[0] / L * 4, M[1] + d[1] / L * 4], c); return; }   // วัตถุที่จุดโฟกัส: รังสีออกขนานกัน
+  const real = (I[0] - M[0]) * dirSign > 0; let d = real ? [I[0] - M[0], I[1] - M[1]] : [M[0] - I[0], M[1] - I[1]]; const L = Math.hypot(...d) || 1; d = [d[0] / L, d[1] / L];
+  const k = Math.abs((xEnd - M[0]) / (d[0] || 1e-6)); seg3d(T, M, [M[0] + d[0] * Math.min(k, 6), M[1] + d[1] * Math.min(k, 6)], c);
+  if (!real) seg3d(T, M, I, c, { dash: 0.05, opacity: 0.6 });
+});
 // ภาพจากเลนส์บาง/กระจกโค้ง: คืนตำแหน่งภาพ s' และกำลังขยาย m (f บวก = รวมแสง)
 const imageOf = (s, f) => { if (Math.abs(s - f) < 1e-6) return { sp: Infinity, m: Infinity }; const sp = 1 / (1 / f - 1 / s); return { sp, m: -sp / s }; };
 
@@ -58,6 +70,21 @@ CASES.push({
    ARW(ix,gy,ix,tipY,'--img',4,'4 4')+T(ix,gy+18,'ภาพเสมือน',{c:'--img'})+
    L(ox,gy+30,mx,gy+30,'--muted',1)+T((ox+mx)/2,gy+44,'s = '+p.s+' cm',{fs:11,c:'--muted'})+L(mx,gy+30,ix,gy+30,'--muted',1)+T((mx+ix)/2,gy+44,'s′ = '+p.s+' cm',{fs:11,c:'--muted'});
   return svg},
+ three: {
+  cam() { return { pos: [0.4, 0.5, 1.1], target: [0, 0.12, 0] }; },
+  build(T, p, o) {
+   const s = p.s / 100, h = p.ho / 100; T.floor(2, { step: 0.05 });
+   const m = T.box(0.01, Math.max(0.3, h * 1.3), 0.5, '--water', { opacity: 0.55 }); m.position.set(0, Math.max(0.3, h * 1.3) / 2, 0);
+   const candle = (x, op) => { const g = T.group(); const c = T.cyl(0.015, 0.015, h, '--c1', { parent: g, opacity: op }); c.position.y = h / 2; const f = T.mesh(new T.THREE.ConeGeometry(0.012, 0.035, 12), '--c5', { parent: g, emissive: '--c5', ei: 0.9, opacity: op }); f.position.y = h + 0.02; g.position.x = x; return g; };
+   candle(-s); candle(s, 0.35); T.label('วัตถุ', '--ink', { pos: [-s, h + 0.07, 0] }); T.label('ภาพเสมือน', '--muted', { pos: [s, h + 0.07, 0] });
+   const eye = T.sphere(0.02, '--ink'); eye.position.set(-s * 0.6, h * 0.6, 0.22);
+   const top = [-s, h + 0.02, 0], hit = [0, (h + 0.02) * 0.6 + h * 0.6 * 0.4, 0.22 * (s / (s + s * 0.6))];
+   T.line('--ray', { pts: [top, hit, eye.position.toArray()] }); T.line('--ray', { pts: [hit, [s, h + 0.02, 0]], dash: 0.01, opacity: 0.6 });
+   T.line('--muted', { pts: [[-s, 0.002, 0.12], [0, 0.002, 0.12]] }); T.label('s = ' + p.s + ' cm', '--muted', { pos: [-s / 2, 0.01, 0.16] });
+   T.line('--muted', { pts: [[0, 0.002, 0.12], [s, 0.002, 0.12]], dash: 0.01 }); T.label("s′ = " + p.s + ' cm', '--muted', { pos: [s / 2, 0.01, 0.16] });
+   return {};
+  }
+ },
  notes:['ขยับวัตถุเข้าหากระจก 1 cm ภาพขยับเข้าหากระจก 1 cm เช่นกัน ระยะระหว่างวัตถุกับภาพเปลี่ยน 2 cm','ถ้าเลื่อนกระจกออกจากวัตถุ x ภาพจะเลื่อนตาม 2x','กระจกยาวแค่ครึ่งหนึ่งของความสูงตัวเรา ก็เห็นเต็มตัว และไม่ขึ้นกับว่ายืนไกลหรือใกล้','รังสีสะท้อนทุกเส้นเมื่อลากต่อไปด้านหลังจะมาพบกันที่ปลายภาพเสมือนพอดี']
 });
 
@@ -89,6 +116,19 @@ CASES.push({
   svg+=L(px,py,...pt(0,p.r*k),'--ray',1.5,'4 4');
   svg+=T(470,60,'ภาพทั้งหมด '+o.n+' ภาพ',{fs:15,b:1,a:'start'})+T(470,84,'วงกลมประ = วงที่ภาพทุกภาพอยู่',{fs:11,a:'start',c:'--muted'})+T(470,104,'วงกลมเปล่า = ภาพเสมือน',{fs:11,a:'start',c:'--muted'})+T(470,124,'จุดทึบ = วัตถุจริง',{fs:11,a:'start',c:'--muted'});
   return svg},
+ three: {
+  cam() { return { pos: [0.8, 2.4, 3.4], target: [0.6, 0.2, -0.3] }; },
+  build(T, p, o) {
+   const r = p.r * 0.05, th = p.th * RAD, H = 0.7, Lm = r * 1.7; T.floor(6, { step: 0.25 });
+   const mir = a => { const m = T.box(Lm, H, 0.015, '--water', { opacity: 0.5, cast: false }); m.position.set(Math.cos(a) * Lm / 2, H / 2, -Math.sin(a) * Lm / 2); m.rotation.y = a; };
+   mir(0); mir(th);
+   const cand = (a, op) => { const g = T.group(); const c = T.cyl(0.03, 0.03, 0.3, '--c1', { parent: g, opacity: op }); c.position.y = 0.15; const fl = T.mesh(new T.THREE.ConeGeometry(0.022, 0.06, 12), '--c5', { parent: g, emissive: '--c5', ei: 0.9, opacity: op }); fl.position.y = 0.33; g.position.set(r * Math.cos(a), 0, -r * Math.sin(a)); return g; };
+   cand(o.phi * RAD); (o._imgs || []).forEach(a => cand(a * RAD, 0.35));
+   const ring = []; for (let i = 0; i <= 72; i++) { const a = i / 72 * 2 * Math.PI; ring.push([r * Math.cos(a), 0.003, -r * Math.sin(a)]); } T.line('--muted', { pts: ring, max: 73, dash: 0.03 });
+   T.label('ภาพ ' + o.n + ' ภาพ (360°/θ − 1)', '--ink', { pos: [0, H + 0.25, 0] });
+   return {};
+  }
+ },
  notes:['θ ลดลง → จำนวนภาพเพิ่มขึ้น (θ = 90° ได้ 3 ภาพ, 60° ได้ 5 ภาพ, 30° ได้ 11 ภาพ)','θ = 180° คือกระจกเงาราบบานเดียว ได้ภาพเดียว','ตำแหน่งของวัตถุในมุมไม่เปลี่ยนจำนวนภาพ แต่เปลี่ยนตำแหน่งของภาพบนวงกลม','ภาพจะอยู่ในส่วนที่กระจกบังไว้ ผู้ดูที่อยู่ระหว่างกระจกจึงเห็นแต่ภาพที่เกิดจากการสะท้อนต่อเนื่อง']
 });
 
@@ -131,6 +171,20 @@ CASES.push({
    svg+=ARW(ix,AX,ix,iy,'--img',4,sp>0?null:'4 4')+T(ix,(hi>=0?iy-8:iy+16),sp>0?'ภาพจริง':'ภาพเสมือน',{c:'--img',fs:11,b:1})}
   const ox=mx-s*k;svg+=`<g data-drag class="drag"><rect x="${ox-14}" y="${AX-ho*KY-8}" width="28" height="${ho*KY+8}" style="fill:transparent"/>`+ARW(ox,AX,ox,AX-ho*KY,'--ink',4)+`</g>`+T(ox,AX+32,'วัตถุ',{b:1});
   return svg},
+ three: {
+  cam() { return { pos: [-0.8, 1.2, 4.8], target: [-1, 0, 0] }; },
+  build(T, p, o) {
+   const f = o._f * OS, s = p.s * OS, h = p.ho * OS, sp = o.sp * OS, hi = o.hi * OS, R = Math.abs(2 * f), conc = p.kind === 'c';
+   T.floor(10, { step: 0.25, y: -1.3 }).position.x = -1; seg3d(T, [-3.6, 0], [1.2, 0], '--muted', { dash: 0.06 });
+   const ap = Math.asin(Math.min(0.55, 1.0 / R)), geo = new T.THREE.SphereGeometry(R, 48, 16, 0, Math.PI * 2, 0, ap);
+   geo.rotateZ(conc ? -Math.PI / 2 : Math.PI / 2); const m = T.mesh(geo, '--water', { side: T.THREE.DoubleSide, cast: false }); m.material.metalness = 0.6; m.material.roughness = 0.2; m.position.x = conc ? -R : R;
+   [[conc ? -Math.abs(f) : Math.abs(f), 'F'], [conc ? -R : R, 'C']].forEach(([x, l]) => { if (Math.abs(x) < 3.6) { const k = T.sphere(0.035, '--ink'); k.position.x = x; T.label(l, '--muted', { pos: [x, -0.18, 0] }); } });
+   arrow3d(T, -s, h, '--c1'); T.label('วัตถุ', '--c1', { pos: [-s, h + 0.18, 0] });
+   if (isFinite(sp)) { const real = sp > 0, x = -sp; arrow3d(T, x, hi, '--c4', real ? 1 : 0.4); T.label(o.type + ' ' + o.ori, '--c4', { pos: [x, hi + (hi > 0 ? 0.18 : -0.18), 0] }); }
+   const O = [-s, h], I = [-sp, hi], y3 = isFinite(hi) ? hi : 0; rays3d(T, O, I, [[0, h], [0, 0], [0, y3]], -3.6, -1, ['--ray', '--ray2', '--c3']);
+   return {};
+  }
+ },
  notes:['กระจกเว้า: s &gt; f ได้ภาพจริงหัวกลับ s &lt; f ได้ภาพเสมือนหัวตั้งขยาย (ใช้ส่องหน้า)','วัตถุเข้าใกล้ F จากด้านไกล ภาพจริงเลื่อนออกไกลและขยายขึ้น','กระจกนูนให้ภาพเสมือน หัวตั้ง ย่อ เสมอ ไม่ว่าวัตถุอยู่ไหน (ใช้เป็นกระจกมองข้างและกระจกโค้งที่ทางแยก เพราะเห็นมุมกว้าง)','f เพิ่ม (กระจกแบนขึ้น) ภาพจริงเลื่อนไปไกลขึ้นและขนาดเล็กลง','สามรังสีหลัก: ขนานแกน → ผ่าน F | ผ่าน F → ขนานแกน | ผ่านจุดยอด → สะท้อนมุมเท่ากัน']
 });
 
@@ -168,6 +222,22 @@ CASES.push({
    svg+=ARW(ix,AX,ix,iy,'--img',4,sp>0?null:'4 4')+T(ix,(hi>=0?iy-8:iy+16),sp>0?'ภาพจริง':'ภาพเสมือน',{c:'--img',fs:11,b:1})}
   const ox=base-s*k;svg+=`<g data-drag class="drag"><rect x="${ox-14}" y="${AX-ho*KY-8}" width="28" height="${ho*KY+8}" style="fill:transparent"/>`+ARW(ox,AX,ox,AX-ho*KY,'--ink',4)+`</g>`+T(ox,AX+32,'วัตถุ',{b:1});
   return svg},
+ three: {
+  cam() { return { pos: [0.3, 1.2, 4.8], target: [0.2, 0, 0] }; },
+  build(T, p, o) {
+   const f = o._f * OS, s = p.s * OS, h = p.ho * OS, sp = o.sp * OS, hi = o.hi * OS, conv = p.kind === 'c';
+   T.floor(10, { step: 0.25, y: -1.3 }); seg3d(T, [-3.4, 0], [3.4, 0], '--muted', { dash: 0.06 });
+   // เลนส์: หมุนโปรไฟล์ (รัศมี, ความหนา) รอบแกน แล้ววางให้แกนเลนส์ตรงกับแกนมุขสำคัญ (แกน x)
+   const R = 1.1, th = r => conv ? 0.17 * (1 - (r / R) ** 2) + 0.012 : 0.03 + 0.14 * (r / R) ** 2, pts = [];
+   for (let i = 0; i <= 24; i++) { const r = R * i / 24; pts.push(new T.THREE.Vector2(r, th(r))); } for (let i = 24; i >= 0; i--) { const r = R * i / 24; pts.push(new T.THREE.Vector2(r, -th(r))); }
+   const geo = new T.THREE.LatheGeometry(pts, 48); geo.rotateZ(-Math.PI / 2); T.mesh(geo, '--water', { opacity: 0.45, side: T.THREE.DoubleSide, cast: false });
+   [[f, 'F'], [-f, 'F'], [2 * f, '2F'], [-2 * f, '2F']].forEach(([x, l]) => { if (Math.abs(x) < 3.4) { const m = T.sphere(0.035, '--ink'); m.position.x = x; T.label(l, '--muted', { pos: [x, -0.18, 0] }); } });
+   arrow3d(T, -s, h, '--c1'); T.label('วัตถุ', '--c1', { pos: [-s, h + 0.18, 0] });
+   if (isFinite(sp)) { const real = sp > 0; arrow3d(T, sp, hi, real ? '--c4' : '--c4', real ? 1 : 0.4); T.label(o.type + ' ' + o.ori, '--c4', { pos: [sp, hi + (hi > 0 ? 0.18 : -0.18), 0] }); }
+   const O = [-s, h], I = [sp, hi], y3 = isFinite(hi) ? hi : 0; rays3d(T, O, I, [[0, h], [0, 0], [0, y3]], 3.4, 1, ['--ray', '--ray2', '--c3']);
+   return {};
+  }
+ },
  notes:['เลนส์นูน: s &gt; f ได้ภาพจริงหัวกลับ (ฉายบนฉากได้) s &lt; f ได้ภาพเสมือนหัวตั้งขยาย (แว่นขยาย)','ยิ่งวัตถุเข้าใกล้ F จากด้านไกล ภาพจริงยิ่งไกลและใหญ่ และกลับด้านเมื่อข้าม F เป็นภาพเสมือน','เลนส์เว้าให้ภาพเสมือน หัวตั้ง ย่อ อยู่ระหว่างวัตถุกับเลนส์ ทุกตำแหน่งวัตถุ','f สั้นลง (เลนส์โค้งมากขึ้น กำลังเลนส์สูงขึ้น) ภาพจริงเกิดใกล้เลนส์ขึ้น','สามรังสีหลัก: ขนานแกน → ผ่าน F′ | ผ่านศูนย์กลางเลนส์ → ตรงไม่หัก | ผ่าน F → ออกขนานแกน']
 });
 
@@ -251,6 +321,21 @@ CASES.push({
   svg+=arcAt(cx,cy,48,-90,-90-p.t1,'θ₁','--ray');
   if(p.n1>p.n2){const tc=Math.asin(p.n2/p.n1);svg+=L(cx-Ln*Math.sin(tc),cy-Ln*Math.cos(tc),cx,cy,'--muted',1,'3 4')+T(cx-Ln*Math.sin(tc)-6,cy-Ln*Math.cos(tc)-6,'มุมวิกฤต '+fmt(o.tc)+'°',{a:'end',fs:10,c:'--muted'})}
   return svg},
+ three: {
+  cam() { return { pos: [1.8, 1.2, 4.2], target: [0, 0, 0] }; },
+  build(T, p, o) {
+   const W = 4, D = 2, a = T.box(W, 1.6, D, '--water', { opacity: 0.04 + 0.1 * (p.n1 - 1), cast: false }); a.position.y = 0.8; const b = T.box(W, 1.6, D, '--water', { opacity: 0.08 + 0.18 * (p.n2 - 1), cast: false }); b.position.y = -0.8;
+   T.label('n₁ = ' + fmt(p.n1), '--ink', { pos: [-1.6, 1.4, 0] }); T.label('n₂ = ' + fmt(p.n2), '--ink', { pos: [-1.6, -1.4, 0] });
+   T.line('--muted', { pts: [[0, 1.5, 0], [0, -1.5, 0]], dash: 0.06 });
+   const ray = (a, d, L, c, r) => T.vec(c, '', { kind: 'v', r, line: false, mid: true }).set(a, d.map(x => x * L));
+   const t1 = p.t1 * RAD, R = o.R / 100;
+   ray([-1.5 * Math.sin(t1), 1.5 * Math.cos(t1), 0], [Math.sin(t1), -Math.cos(t1), 0], 1.5, '--ray', 0.022).set([-1.5 * Math.sin(t1), 1.5 * Math.cos(t1), 0], [1.5 * Math.sin(t1), -1.5 * Math.cos(t1), 0], 'θ₁ ' + p.t1 + '°');
+   T.vec('--ray', '', { kind: 'v', r: 0.022 * Math.max(0.35, Math.sqrt(R)), line: false, opacity: 0.4 + 0.6 * R }).set([0, 0, 0], [1.2 * Math.sin(t1), 1.2 * Math.cos(t1), 0], 'สะท้อน ' + fmt(o.R) + '%');
+   if (!o._tir) { const t2 = o.t2 * RAD; T.vec('--ray2', '', { kind: 'v', r: 0.022, line: false }).set([0, 0, 0], [1.5 * Math.sin(t2), -1.5 * Math.cos(t2), 0], 'θ₂ ' + fmt(o.t2) + '°'); }
+   else T.label('สะท้อนกลับหมด', '--bad', { pos: [1, -0.6, 0] });
+   return {};
+  }
+ },
  notes:['n₂ มากขึ้น (แสงช้าลง) → θ₂ ลดลง แสงเบนเข้าหาเส้นปกติ','θ₁ เพิ่ม → θ₂ เพิ่ม และสัดส่วนแสงที่สะท้อนเพิ่มขึ้นมาก เมื่อใกล้ 90°','ไปตัวกลางที่ n น้อยกว่า (เช่น แก้ว → อากาศ): θ₂ &gt; θ₁ ถึง θ₂ = 90° ที่มุมวิกฤต เกินนั้นเกิดสะท้อนกลับหมด','ความถี่ของแสงไม่เปลี่ยนเมื่อเปลี่ยนตัวกลาง v และ λ เปลี่ยนตามกัน (λ = v/f)']
 });
 
@@ -280,6 +365,21 @@ CASES.push({
   svg+=arcAt(cx,top,34,-90,-90-p.t1,'θ₁','--ray')+arcAt(cx,top,30,90,90-o.t2,'θ₂','--ray2')+T(120,top+tp/2+4,'t = '+p.t+' cm',{a:'end',fs:11,c:'--muted'})+
    T(14,16,'ส้ม = แสงในอากาศ (เข้าและออกขนานกัน)',{a:'start',fs:11,c:'--ray'})+T(14,32,'ฟ้า = แสงในแผ่น',{a:'start',fs:11,c:'--ray2'})+T(14,48,'เส้นประ = ทางตรงถ้าไม่มีแผ่น',{a:'start',fs:11,c:'--muted'});
   return svg},
+ three: {
+  cam() { return { pos: [1.2, 0.8, 4], target: [0.3, -0.2, 0] }; },
+  build(T, p, o) {
+   const t = p.t * 0.15, W = 4.5, sl = T.box(W, t, 1.6, '--water', { opacity: 0.35, cast: false }); sl.position.set(0.5, -t / 2, 0);
+   const t1 = p.t1 * RAD, t2 = o.t2 * RAD, A = [0, 0], B = [t * Math.tan(t2), -t], L = 1.6, c = { kind: 'v', line: false, r: 0.022 };
+   T.vec('--ray', '', c).set([-L * Math.sin(t1), L * Math.cos(t1), 0], [L * Math.sin(t1), -L * Math.cos(t1), 0], 'θ₁ ' + p.t1 + '°');
+   T.vec('--ray', '', c).set([A[0], A[1], 0], [B[0] - A[0], B[1] - A[1], 0], 'θ₂ ' + fmt(o.t2) + '°');
+   T.vec('--ray', '', c).set([B[0], B[1], 0], [L * Math.sin(t1), -L * Math.cos(t1), 0]);
+   seg3d(T, B, [B[0] + 2 * L * Math.sin(t1), B[1] - 2 * L * Math.cos(t1) + 2 * L * Math.cos(t1) - 2 * L * Math.cos(t1)], '--ray', { opacity: 0 });
+   seg3d(T, A, [A[0] + 2.2 * Math.sin(t1), A[1] - 2.2 * Math.cos(t1)], '--muted', { dash: 0.05 });   // แนวเดิมถ้าไม่มีแผ่น
+   [A, B].forEach(P => seg3d(T, [P[0], P[1] + 0.5], [P[0], P[1] - 0.5], '--muted', { dash: 0.04 }));
+   T.label('n = ' + fmt(p.n) + ', t = ' + p.t + ' cm', '--ink', { pos: [2.2, -t / 2, 0.85] }); T.label('เลื่อนด้านข้าง d = ' + fmt(o.d) + ' cm', '--c4', { pos: [B[0] + 1.2, B[1] - 0.6, 0] });
+   return {};
+  }
+ },
  notes:['θ₁ = 0° แสงตั้งฉาก ไม่เบน และไม่เลื่อน (d = 0)','t↑ → d↑ เป็นสัดส่วนตรง และ θ₁↑ → d↑','n↑ → θ₂↓ และ d↑ (แสงเบนมากขึ้น)','มองตรงผ่านแผ่นหนา t วัตถุด้านหลังดูเหมือนอยู่ใกล้กว่าจริงเป็น t/n เหมือนก้นสระที่ดูตื้นกว่าความจริง']
 });
 
@@ -326,6 +426,29 @@ CASES.push({
   const nx=Math.cos(h),ny=-Math.sin(h);svg+=L(X(E1[0]-60*nx),Y(E1[1]-60*ny),X(E1[0]+40*nx),Y(E1[1]+40*ny),'--muted',1,'3 4');
   svg+=(o._tr.ok?T(600,280,'δ = '+fmt(o.dl)+'°',{a:'end',fs:13,b:1}):'');
   return svg},
+ three: {
+  cam() { return { pos: [0.4, 0.6, 4.2], target: [0.7, -0.9, 0] }; },
+  build(T, p, o) {
+   const Lf = 1.5, h = p.A / 2 * RAD, bl = [-Lf * Math.sin(h), -Lf * Math.cos(h)], br = [Lf * Math.sin(h), -Lf * Math.cos(h)], D = 0.8;
+   const pr = T.extrude([[0, 0], bl, br], D, '--water', { opacity: 0.35, cast: false }); pr.material.side = T.THREE.DoubleSide;
+   const eg = new T.THREE.LineSegments(new T.THREE.EdgesGeometry(pr.geometry), new T.THREE.LineBasicMaterial({ color: T.color('--water') })); T.scene.add(eg);
+   T.floor(8, { step: 0.25, y: -1.9 }).position.x = 0.8;
+   const ray = (a, b, c, r = 0.012) => { const L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = T.cyl(r, r, L, '--ray', { cast: false }); m.material = new T.THREE.MeshStandardMaterial({ color: new T.THREE.Color(c), emissive: new T.THREE.Color(c), emissiveIntensity: 0.6 }); m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0); m.rotation.z = Math.atan2(b[1] - a[1], b[0] - a[0]) - Math.PI / 2; };
+   const E1 = [0.55 * bl[0], 0.55 * bl[1]], phiIn = -h + p.t1 * RAD, white = '#' + T.color('--ink').getHexString();
+   ray([E1[0] - 1.6 * Math.cos(phiIn), E1[1] - 1.6 * Math.sin(phiIn)], E1, white, 0.018);
+   T.vec('--ink', null, { kind: 'v', r: 0.012, line: false }).set([E1[0] - 1.0 * Math.cos(phiIn), E1[1] - 1.0 * Math.sin(phiIn), 0], [0.3 * Math.cos(phiIn), 0.3 * Math.sin(phiIn), 0]);
+   const scr = T.box(0.04, 2.4, 1.2, '--panel'); scr.position.set(3.3, -1.1, 0);
+   const trace = (n, c) => {
+    const t = prismTrace(n, p.A, p.t1), phi2 = -h + t.t2, dx = Math.cos(phi2), dy = Math.sin(phi2), fx = Math.sin(h), fy = -Math.cos(h), D2 = dx * -fy - -fx * dy, s = (-E1[0] * -fy - -fx * -E1[1]) / D2, E2 = [E1[0] + s * dx, E1[1] + s * dy];
+    ray(E1, E2, c);
+    if (t.ok) { const po = h - t.t4, k = (3.28 - E2[0]) / Math.max(1e-3, Math.cos(po)), P = [E2[0] + k * Math.cos(po), E2[1] + k * Math.sin(po)]; if (k > 0) { ray(E2, P, c); const sp = T.sphere(0.035, '--ray', { cast: false }); sp.material = new T.THREE.MeshStandardMaterial({ color: new T.THREE.Color(c), emissive: new T.THREE.Color(c), emissiveIntensity: 0.9 }); sp.position.set(3.27, P[1], 0); } }
+   };
+   if (p.disp) ['#f03e3e', '#fd7e14', '#fab005', '#37b24d', '#1c7ed6', '#4c6ef5', '#845ef7'].forEach((c, i) => trace(p.n - 0.012 + 0.032 * i / 6, c));
+   else trace(p.n, white);
+   T.label('A = ' + p.A + '°', '--accent', { pos: [0, 0.25, 0] }); if (o._tr.ok) T.label('δ = ' + fmt(o.dl) + '°', '--ink', { pos: [2.6, 0.4, 0] }); else T.label('สะท้อนกลับหมดภายใน', '--bad', { pos: [1.4, 0.3, 0] });
+   return {};
+  }
+ },
  notes:['n↑ → δ↑ แสงเบนมากขึ้น และแสงม่วง (n มากกว่า) เบนมากกว่าแสงแดง จึงเรียงสีเป็นสเปกตรัม','A↑ → δ↑ ปริซึมที่ยอดแหลมมากเบนน้อย','θ₁ ที่ทำให้ δ ต่ำที่สุดคือเมื่อแสงผ่านสมมาตร (θ₁ = θ₄) ตรงกับที่รังสีในปริซึมขนานฐาน','ถ้า A ใหญ่หรือ n ใหญ่ แสงอาจตกผิวที่สองเกินมุมวิกฤตและไม่ออก']
 });
 
@@ -408,6 +531,21 @@ CASES.push({
   if(pts)svg+=PL(pts,'--ray2',2.5);
   svg+=arcAt(x0,cy,34,0,-p.a,'α','--ray');
   return svg},
+ three: {
+  cam() { return { pos: [2.2, 1.6, 4.4], target: [2.4, 0, 0] }; },
+  build(T, p, o) {
+   const Lf = 5.5, R = 0.5, cl = T.cyl(R + 0.12, R + 0.12, Lf, '--c4', { opacity: 0.12, cast: false }); cl.rotation.z = Math.PI / 2; cl.position.x = Lf / 2;
+   const co = T.cyl(R, R, Lf, '--water', { opacity: 0.25, cast: false }); co.rotation.z = Math.PI / 2; co.position.x = Lf / 2;
+   T.label('แกน n₁ = ' + fmt(p.n1), '--ink', { pos: [Lf / 2, R + 0.45, 0] }); T.label('เปลือก n₂ = ' + fmt(p.n2), '--c4', { pos: [Lf / 2, -R - 0.4, 0] });
+   const a = p.a * RAD, seg = (A, B, c, op) => T.vec(c, null, { kind: 'v', r: 0.02, line: false, opacity: op }).set(A, [B[0] - A[0], B[1] - A[1], 0]);
+   seg([-1.2 * Math.cos(a), 1.2 * Math.sin(a), 0], [0, 0, 0], '--ray');
+   const b = o._b, dx = Math.cos(b), dy = -Math.sin(b); let P = [0, 0], d = [dx, dy], n = 0, lost = false;
+   while (P[0] < Lf && n < 40) { const tt = d[1] > 1e-9 ? (R - P[1]) / d[1] : d[1] < -1e-9 ? (-R - P[1]) / d[1] : (Lf - P[0]) / d[0], Q = [P[0] + d[0] * tt, P[1] + d[1] * tt]; if (Q[0] > Lf) { const u = (Lf - P[0]) / d[0]; seg([P[0], P[1], 0], [Lf, P[1] + d[1] * u, 0], '--ray'); break; }
+    seg([P[0], P[1], 0], [Q[0], Q[1], 0], '--ray'); if (!o._g) { seg([Q[0], Q[1], 0], [Q[0] + 0.5 * d[0], Q[1] + Math.sign(d[1]) * 0.5, 0], '--bad', 0.7); lost = true; break; } P = Q; d = [d[0], -d[1]]; n++; }
+   T.label(o.st, o._g ? '--good' : '--bad', { pos: [Lf / 2, R + 0.9, 0] });
+   return {};
+  }
+ },
  notes:['n₁ − n₂ ยิ่งมาก มุมรับยิ่งกว้าง (NA มาก) รับแสงได้มากแต่แสงหลายเส้นทางทำให้สัญญาณกระจายตัวเร็วขึ้น','α เกิน α<sub>max</sub> → มุมตกกระทบที่ผนังน้อยกว่ามุมวิกฤต แสงบางส่วนทะลุไปเปลือกและหายไป','α = 0° แสงวิ่งตรงตามแกน ไม่มีการสะท้อน','สายเคเบิลใยแก้วอินเทอร์เน็ตและกล้องส่องภายในร่างกาย (เอ็นโดสโคป) ใช้หลักการนี้']
 });
 

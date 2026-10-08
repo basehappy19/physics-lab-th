@@ -70,6 +70,21 @@ CASES.push({
    T(xs+sh/4-8,(yb+yt)/2-6,'c·t/2',{a:'end',fs:12,b:1,c:'--ray'})+T(xs+sh/2,yt-10,'1 จังหวะ = t = '+fmt(g)+' × t₀',{fs:11,b:1});
   s+=T(626,288,'(ภาพนี้ปรับขนาดให้พอดีจอ)',{a:'end',fs:10,c:'--muted'});
   return s},
+ three: {
+  cam() { return { pos: [1.2, 1.6, 7.4], target: [1.4, 0.7, 0] }; },
+  build(T, p, o) {
+   const g = o.g; let h = 1.4, sh = 2 * p.v * g * h; if (sh > 5) { h *= 5 / sh; sh = 5; }
+   T.floor(14, { step: 0.5, y: -0.4 }).position.x = 1.6;
+   const mirror = (x, y, c = '--ink', op) => { const m = T.box(0.7, 0.05, 0.5, c, op ? { opacity: op } : {}); m.position.set(x, y, 0); };
+   const xl = -2.2; mirror(xl, 0); mirror(xl, h); T.vec('--c1', null, { kind: 'v', r: 0.025, line: false }).set([xl, 0.05, 0], [0, h - 0.1, 0]); T.label('บนยาน: แสงขึ้นลงตรง ๆ · t₀', '--ink', { pos: [xl, h + 0.45, 0] });
+   const x0 = 0; [0, 0.5, 1].forEach((f, i) => { const op = i === 1 ? 0.35 : 0; mirror(x0 + f * sh, 0, '--ink', op || undefined); mirror(x0 + f * sh, h, '--ink', op || undefined); });
+   T.vec('--c1', null, { kind: 'v', r: 0.025, line: false }).set([x0, 0.05, 0], [sh / 2, h - 0.1, 0]); T.vec('--c1', null, { kind: 'v', r: 0.025, line: false }).set([x0 + sh / 2, h - 0.05, 0], [sh / 2, -(h - 0.1), 0]);
+   T.line('--accent', { pts: [[x0 + sh / 2, 0, 0], [x0 + sh / 2, h, 0]], dash: 0.06 }); T.label('h', '--accent', { pos: [x0 + sh / 2 + 0.15, h / 2, 0] });
+   T.vec('--c2', '', { kind: 'v', r: 0.02 }).set([x0, -0.25, 0], [sh, 0, 0], 'ยานเลื่อนไป v·t');
+   T.label('บนโลก: แสงวิ่งเฉียง · t = ' + fmt(g) + ' × t₀', '--ink', { pos: [x0 + sh / 2, h + 0.45, 0] });
+   return {};
+  }
+ },
  notes:['แสงมีความเร็ว c เท่ากันในทุกกรอบอ้างอิง ผู้สังเกตบนโลกเห็นแสงเดินทางไกลกว่า แต่เร็วเท่าเดิม จึงต้องใช้เวลานานกว่า','v↑ → γ↑ → t↑ เมื่อ v เข้าใกล้ c เวลาที่ผู้สังเกตนิ่งวัดได้ยืดออกไปไม่จำกัด','v ต่ำ (v ≪ c) γ เกือบ 1 จึงไม่เห็นผลในชีวิตประจำวัน','เวลาที่สั้นที่สุดคือ "เวลาแท้" t₀ วัดในกรอบที่นาฬิกาอยู่นิ่ง เวลาของผู้สังเกตที่เคลื่อนที่เทียบกับนาฬิกายาวกว่าเสมอ','นาฬิกาทุกชนิด (ชีวภาพด้วย) เป็นไปตามกฎเดียวกัน ไม่ได้เป็นแค่นาฬิกาแสง']
 });
 // ---------- 3 ความยาวหดสั้น ----------
@@ -94,6 +109,17 @@ CASES.push({
    `<rect x="${x0}" y="215" width="${Lp}" height="${h}" style="fill:var(--water-soft);stroke:var(--ink);stroke-width:2.5"/><polygon points="${x0+Lp},215 ${x0+Lp+26},228 ${x0+Lp},241" style="fill:var(--water-soft);stroke:var(--ink);stroke-width:2.5"/>`+
    bracket(x0,x0+Lp,209,'L')+ARW(x0+Lp+40,228,x0+Lp+40+clamp(p.v*80,16,80),228,'--ray',3)+T(x0+W/2+Lp/2,268,'เส้นประ = ความยาวขณะอยู่นิ่ง ความสูงไม่เปลี่ยน',{fs:11,c:'--muted'});
   return s},
+ three: {
+  cam() { return { pos: [0, 2.2, 7.5], target: [0, 0.7, 0] }; },
+  build(T, p, o) {
+   const sc = 4.5 / 200, L0 = p.L0 * sc, L = o.L * sc, ship = (len, z, c, lab) => { const g = T.group(); g.position.y = z; const b = T.cyl(0.28, 0.28, len, c, { parent: g }); b.rotation.z = Math.PI / 2; const nose = T.mesh(new T.THREE.ConeGeometry(0.28, 0.5 * len / L0, 24), c, { parent: g }); nose.rotation.z = -Math.PI / 2; nose.position.x = len / 2 + 0.25 * len / L0; const fin = T.box(0.3 * len / L0, 0.5, 0.06, '--ink', { parent: g }); fin.position.set(-len / 2 + 0.15, 0.3, 0); T.label(lab, '--ink', { pos: [0, z + 0.65, 0] }); return g; };
+   ship(L0, 1.5, '--c2', 'ยานขณะอยู่นิ่ง L₀ = ' + fmt(p.L0) + ' m');
+   ship(L, 0, '--c1', 'เมื่อเคลื่อนที่ ' + fmt(p.v) + 'c: L = ' + fmt(o.L) + ' m');
+   T.vec('--c1', '', { kind: 'v', r: 0.03, line: false }).set([L / 2 + 0.7, 0, 0], [0.4 + p.v, 0, 0], 'v = ' + fmt(p.v) + 'c');
+   T.floor(10, { step: 0.5, y: -0.6 }); T.label('หดเฉพาะแนวการเคลื่อนที่ · γ = ' + fmt(o.g), '--muted', { pos: [0, -0.4, 2.4] });
+   return {};
+  }
+ },
  notes:['v↑ → γ↑ → L↓ ที่ 0.8c ยานยาว 100 m เหลือ 60 m ที่ 0.99c เหลือประมาณ 14 m','การหดสั้นเกิดเฉพาะแนวที่ขนานกับการเคลื่อนที่ ความสูงและความกว้างไม่เปลี่ยน','เทียบกับยาน L₀ เป็นความยาวที่ยาวที่สุดที่ใครๆ วัดได้ ผู้สังเกตที่เคลื่อนที่เทียบกับวัตถุวัดได้สั้นกว่าเสมอ','ในข้อ 14 "ระยะโลก–ดาว" คือความยาวแท้ L₀ ของผู้สังเกตบนโลก นักบินที่เคลื่อนที่ผ่านจึงวัดได้ L = L₀/γ']
 });
 // ---------- 4 กราฟแกมมา ----------

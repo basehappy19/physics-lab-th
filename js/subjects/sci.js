@@ -57,10 +57,31 @@ CASES.push({
     }
   },
   handles(p, o) { const r = o._r; return [{ id: 'jaw', x: r.pos + 0.5, y: -12, set: x => ({ w: clamp(x - 0.5 - p.z, 0, 120) }) }]; },
+  three: {
+    cam(p, o) { const x = (o._r.pos + 6) * 0.1; return { pos: [x, 0.9, 4.6], target: [x, -0.2, 0] }; },
+    build(T, p, o) {
+      const r = o._r, V = r.V, k = 0.1, ink = '#' + T.color('--ink').getHexString(), hl = '#' + T.color('--c1').getHexString();
+      // สเกลเป็นภาพบน canvas แล้วติดบนหน้าตัวคาลิปเปอร์ (ไม่ต้องสร้างขีดเป็นวัตถุทีละอัน)
+      const tex = (wmm, hmm, draw) => { const cv = document.createElement('canvas'), ppm = 20; cv.width = Math.ceil(wmm * ppm); cv.height = Math.ceil(hmm * ppm); const c = cv.getContext('2d'); c.fillStyle = '#' + T.color('--panel').getHexString(); c.fillRect(0, 0, cv.width, cv.height); c.strokeStyle = ink; c.fillStyle = ink; draw(c, ppm); const t = new T.THREE.CanvasTexture(cv); t.anisotropy = 4; return t; };
+      const face = (wmm, hmm, x0, y0, t) => { const m = new T.THREE.Mesh(new T.THREE.PlaneGeometry(wmm * k, hmm * k), new T.THREE.MeshStandardMaterial({ map: t, roughness: 0.6 })); m.position.set((x0 + wmm / 2) * k, (y0 + hmm / 2) * k, 0.101); T.scene.add(m); return m; };
+      const W0 = -6, W1 = 150, mainT = tex(W1 - W0, 8, (c, s) => { for (let x = 0; x <= 150; x++) { const h = x % 10 === 0 ? 3.6 : x % 5 === 0 ? 2.6 : 1.7, on = x === r.main + r.n && !p.quiz; c.strokeStyle = on ? hl : ink; c.lineWidth = on ? 4 : 2; c.beginPath(); c.moveTo((x - W0) * s, 8 * s); c.lineTo((x - W0) * s, (8 - h) * s); c.stroke(); if (x % 10 === 0) { c.fillStyle = ink; c.font = `bold ${2.6 * s}px sans-serif`; c.textAlign = 'center'; c.fillText(String(x / 10), (x - W0) * s, 3 * s); } } });
+      const beam = T.box((W1 - W0) * k, 0.8, 0.2, '--block'); beam.position.set((W0 + W1) / 2 * k, 0.4, 0); face(W1 - W0, 8, W0, 0, mainT);
+      const fj = T.box(0.4, 1.8, 0.2, '--block'); fj.position.set(-0.2, -0.9, 0);
+      const L = V.n * r.sp, vT = tex(L + 3, 6.5, (c, s) => { for (let i = 0; i <= V.n; i++) { const x = 1.5 + i * r.sp, on = i === r.n && !p.quiz, h = i % V.lab === 0 ? 2.8 : 1.8; c.strokeStyle = on ? hl : ink; c.lineWidth = on ? 4 : 2; c.beginPath(); c.moveTo(x * s, 0); c.lineTo(x * s, h * s); c.stroke(); if (i % V.lab === 0) { c.fillStyle = ink; c.font = `${2 * s}px sans-serif`; c.textAlign = 'center'; c.fillText(String(i / V.lab), x * s, 4.8 * s); } } });
+      const sl = T.group(); sl.position.x = r.pos * k;
+      const sb = T.box((L + 3) * k, 0.65, 0.2, '--panel', { parent: sl }); sb.position.set((L / 2) * k, -0.325, 0);
+      const fm = face(L + 3, 6.5, r.pos - 1.5, -6.5, vT);
+      const mj = T.box(0.4, 1.15, 0.2, '--panel', { parent: sl }); mj.position.set(0.05, -1.22, 0);
+      const obj = T.box(Math.max(p.w, 0.01) * k, 0.8, 0.35, '--block2'); obj.position.set(p.w * k / 2, -1.2, 0);
+      T.label(p.quiz ? 'โหมดฝึกอ่าน: อ่านค่าเอง' : `อ่านได้ ${r.main} + ${r.n} × ${p.lc} = ${fx(r.read, V.d)} mm`, p.quiz ? '--accent' : '--ink', { pos: [r.pos * k + 1, 1.15, 0] });
+      return {};
+    }
+  },
   notes: ['หาขีดสเกลหลักที่อยู่ก่อนขีดศูนย์ของเวอร์เนียร์ จากนั้นหาขีดบนเวอร์เนียร์ที่ตรงกับขีดบนสเกลหลักพอดี (ขีดสีส้ม)', 'เวอร์เนียร์ 20 ช่องยาว 19 mm แต่ละช่องสั้นกว่า 1 mm อยู่ 0.05 mm นี่คือที่มาของค่าความละเอียด', 'ถ้าปิดขากรรไกรแล้วศูนย์ไม่ตรง (ความคลาดเคลื่อนศูนย์) ต้องลบค่านั้นออกจากค่าที่อ่านได้', 'ผลที่บันทึกควรมีทศนิยมตามความละเอียดของเครื่องมือ เช่น 23.45 mm สำหรับ 0.05 mm']
 });
 
 // ---------- 2 ไมโครมิเตอร์ ----------
+const TH0 = 0;
 function micro(p) {
   const pos = p.w + p.z, sleeve = Math.floor(pos * 2 + 1e-9) / 2, th = Math.round((pos - sleeve) * 100) % 50;
   return { pos, sleeve, th, read: sleeve + th * 0.01 };
@@ -102,6 +123,30 @@ CASES.push({
     }
   },
   handles(p, o) { return [{ id: 'th', x: o._r.pos + 6.5, y: -4, set: x => ({ w: clamp(x - 6.5 - p.z, 0, 25) }) }]; },
+  three: {
+    cam(p, o) { const x = (o._r.pos + 4) * 0.1; return { pos: [x + 0.2, 0.9, 2.4], target: [x, 0, 0] }; },
+    build(T, p, o) {
+      const r = o._r, k = 0.1, ink = '#' + T.color('--ink').getHexString(), hl = '#' + T.color('--c1').getHexString(), bg = '#' + T.color('--panel').getHexString();
+      const canvas = (w, h, draw) => { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const c = cv.getContext('2d'); c.fillStyle = bg; c.fillRect(0, 0, w, h); draw(c); const t = new T.THREE.CanvasTexture(cv); t.anisotropy = 4; return t; };
+      // โครงรูปตัว C และแกน
+      const fr = T.box(0.25, 1.4, 0.2, '--c2'); fr.position.set(-0.45, -0.75, 0); const fb = T.box(3.2, 0.25, 0.2, '--c2'); fb.position.set(1.1, -1.4, 0);
+      const anv = T.cyl(0.12, 0.12, 0.3, '--muted'); anv.rotation.z = Math.PI / 2; anv.position.set(-0.17, 0, 0);
+      const obj = T.box(Math.max(p.w, 0.05) * k, 0.5, 0.5, '--block2'); obj.position.set(p.w * k / 2, 0, 0);
+      const spL = r.pos * k + 0.05, sp = T.cyl(0.11, 0.11, 1, '--muted'); sp.rotation.z = Math.PI / 2; sp.scale.y = 1.4; sp.position.set(r.pos * k + 0.7, 0, 0);
+      // ปลอกนอก (ขีดบนแถบด้านหน้า)
+      const sleeveLen = r.pos * k + 0.15, sl = T.cyl(0.32, 0.32, sleeveLen, '--block'); sl.rotation.z = Math.PI / 2; sl.position.set(sleeveLen / 2, 0, -0.02);
+      const ppm = 40, sT = canvas(Math.ceil(27 * ppm), 6 * ppm, c => { c.strokeStyle = ink; c.lineWidth = 3; c.beginPath(); c.moveTo(0, 3 * ppm); c.lineTo(27 * ppm, 3 * ppm); c.stroke(); for (let q = 0; q <= 50; q++) { const x = (q / 2 + 1.5) * ppm; if (q % 2 === 0) { c.beginPath(); c.moveTo(x, 3 * ppm); c.lineTo(x, (3 - ((q / 2) % 5 === 0 ? 2 : 1.4)) * ppm); c.stroke(); if ((q / 2) % 5 === 0) { c.fillStyle = ink; c.font = `bold ${1.1 * ppm}px sans-serif`; c.textAlign = 'center'; c.fillText(String(q / 2), x, 0.95 * ppm); } } else { c.beginPath(); c.moveTo(x, 3 * ppm); c.lineTo(x, 4.3 * ppm); c.stroke(); } } });
+      sT.repeat.x = sleeveLen / 2.7; const plate = new T.THREE.Mesh(new T.THREE.PlaneGeometry(sleeveLen, 0.6), new T.THREE.MeshStandardMaterial({ map: sT })); plate.position.set(sleeveLen / 2, 0, 0.322); T.scene.add(plate);   // ปลอกนอกโผล่เฉพาะส่วนที่ปลอกหมุนยังไม่คลุม
+      // ปลอกหมุน: ขีด 50 ช่องรอบวง หมุนตามค่าที่วัด
+      const tT = canvas(2000, 300, c => { c.strokeStyle = ink; c.fillStyle = ink; c.font = 'bold 56px sans-serif'; c.textAlign = 'left'; for (let d = 0; d < 50; d++) { const x = (1 - d / 50) * 2000; c.lineWidth = 5; c.beginPath(); c.moveTo(x, 0); c.lineTo(x, d % 5 === 0 ? 140 : 90); c.stroke(); if (d % 5 === 0) { c.save(); c.translate(x + 18, 150); c.rotate(Math.PI / 2); c.fillText(String(d), 0, 0); c.restore(); } } });
+      const th = new T.THREE.Mesh(new T.THREE.CylinderGeometry(0.38, 0.38, 1.3, 64, 1, false), new T.THREE.MeshStandardMaterial({ map: tT, roughness: 0.5 }));
+      const tg = T.group(); tg.rotation.z = Math.PI / 2; tg.position.set(r.pos * k + 0.15 + 0.65, 0, 0); tg.add(th);
+      th.rotation.y = TH0 + (((r.pos * 100) % 50) / 50) * 2 * Math.PI;   // หมุนรอบแกนของตัวเอง: ขีดที่ตรงเส้นอ้างอิงด้านหน้า = ค่าบนปลอกหมุน
+      const knob = T.cyl(0.25, 0.25, 0.4, '--block'); knob.rotation.z = Math.PI / 2; knob.position.set(r.pos * k + 0.15 + 1.5, 0, 0);
+      T.label(p.quiz ? 'โหมดฝึกอ่าน: อ่านค่าเอง' : `อ่านได้ ${fx(r.sleeve, 1)} + ${r.th} × 0.01 = ${fx(r.read, 2)} mm`, p.quiz ? '--accent' : '--ink', { pos: [r.pos * k + 0.6, 0.85, 0] });
+      return {};
+    }
+  },
   notes: ['ดูขีดบนปลอกนอกที่โผล่พ้นขอบปลอกหมุน ขีดบน = มิลลิเมตรเต็ม ขีดล่าง = ครึ่งมิลลิเมตร', 'ปลอกหมุน 1 รอบเลื่อน 0.5 mm แบ่ง 50 ช่อง จึงละเอียด 0.01 mm', 'ถ้าเห็นขีดครึ่งมิลลิเมตรโผล่แล้ว ต้องบวก 0.5 mm ก่อนบวกค่าจากปลอกหมุน']
 });
 

@@ -39,6 +39,22 @@ CASES.push({
     }
   },
   plot: { series: [{ label: 'N ที่เหลือ', unit: 'ตัว', c: '--c1', f: s => s.N }] },
+  three: {
+    cam(p) { const n = Math.ceil(Math.cbrt(p.N0)); return { pos: [n * 1.1, n * 0.9, n * 1.6], target: [0, 0, 0] }; },
+    build(T, p) {
+      // นิวเคลียสทั้งหมดเป็น InstancedMesh ก้อนเดียว (วาดครั้งเดียวไม่ว่ามีกี่ตัว)
+      const n = Math.ceil(Math.cbrt(p.N0)), geo = new T.THREE.SphereGeometry(0.32, 12, 8), mat = new T.THREE.MeshStandardMaterial({ roughness: 0.5 });
+      const im = new T.THREE.InstancedMesh(geo, mat, p.N0), M = new T.THREE.Matrix4();
+      for (let i = 0; i < p.N0; i++) { const x = i % n, y = Math.floor(i / n) % n, z = Math.floor(i / (n * n)); M.setPosition(x - (n - 1) / 2, y - (n - 1) / 2, z - (n - 1) / 2); im.setMatrixAt(i, M); }
+      T.scene.add(im);
+      return { im, cA: T.color('--c1'), cD: T.color('--line'), cF: T.color('--c5'), lab: T.label('', '--ink', { pos: [0, n * 0.75, 0] }), n };
+    },
+    update(ob, st, p) {
+      const t = st.t; (st.A || []).forEach((a, i) => ob.im.setColorAt(i, a.td > t ? ob.cA : (t - a.td < 0.25 ? ob.cF : ob.cD)));
+      if (ob.im.instanceColor) ob.im.instanceColor.needsUpdate = true;
+      ob.lab.set(`เหลือ ${st.N != null ? st.N : p.N0} จาก ${p.N0} ตัว · ${fmt(t / p.th)} ครึ่งชีวิต`, null);
+    }
+  },
   notes: ['การสลายตัวเป็นเรื่องความน่าจะเป็น นิวเคลียสที่เหลืออยู่ไม่ได้ "แก่" ขึ้น โอกาสสลายต่อวินาทีคงที่', 'จำนวนน้อยๆ ผลจากการสุ่มเบี่ยงจากทฤษฎีมาก จำนวนมากจะใกล้ทฤษฎี', 'หลัง 1, 2, 3 ครึ่งชีวิต เหลือ 1/2, 1/4, 1/8 ของเดิม']
 });
 
@@ -83,6 +99,26 @@ CASES.push({
       g.fn(x => { const V = (x - gx) / gw * 8 - 2; return Y(o._K <= 0 ? 0 : V <= 0 ? p.I : V >= o._K ? 0 : p.I * (1 - V / o._K)); }, X(-2), X(6), { c: '--c1', w: 2 }); g.circle(X(p.V), Y(o.cur), 4, { px: true, fill: '--c1' }); g.text(X(0), gy - 0.25, '0 V', { fs: 9, c: '--muted' }); g.text(gx + gw, gy - 0.25, 'กราฟกระแสกับ V', { a: 'right', fs: 10, c: '--muted' });
     }
   },
+  three: {
+    cam() { return { pos: [2.6, 3.2, 6.4], target: [3, 1.2, 0] }; },
+    build(T, p) {
+      T.floor(12, { step: 0.5, y: -0.6 }).position.x = 3;
+      const pl = T.box(0.25, 2.6, 2, '--muted'); pl.position.set(1.15, 1.5, 0); T.label(METALS[p.met][0], '--ink', { pos: [1.15, 3.1, 0] });
+      const cl = T.box(0.3, 2.6, 2, '--block'); cl.position.set(6.5, 1.5, 0); T.label('ขั้วรับ', '--ink', { pos: [6.5, 3.1, 0] });
+      const lc = T.color(p.nm >= 380 && p.nm <= 750 ? wlColor(p.nm) : p.nm < 380 ? '--c4' : '--bad'), lamp = T.cyl(0.3, 0.45, 0.6, '--ink'); lamp.position.set(-1.6, 4.6, 0); lamp.rotation.z = -0.7;
+      const beam = T.cyl(0.05, 0.6, 3.6, '--c5', { opacity: 0.12, cast: false }); beam.material.color.copy(lc); beam.position.set(-0.3, 3.1, 0); beam.rotation.z = -0.7;
+      const ph = [], el = []; for (let i = 0; i < 60; i++) { const s = T.sphere(0.07, '--c5', { cast: false }); s.material = new T.THREE.MeshStandardMaterial({ color: lc, emissive: lc, emissiveIntensity: 0.6 }); s.visible = false; ph.push(s); }
+      for (let i = 0; i < 120; i++) { const s = T.sphere(0.06, '--neg', { cast: false }); s.visible = false; el.push(s); }
+      T.label('V = ' + fmt(p.V) + ' V', '--ink', { pos: [3.8, -0.3, 1.1] });
+      return { ph, el, aE: T.vec('--neg', 'v อิเล็กตรอน', { kind: 'v', r: 0.025, pad: 0.15 }) };
+    },
+    update(ob, st, p, o) {
+      const zf = i => ((i * 0.618) % 1 - 0.5) * 1.6;
+      ob.ph.forEach((s, i) => { const q = (st.ph || [])[i]; s.visible = !!q; if (q) s.position.set(q.x + 0.3, q.y + 0.3, zf(i)); });
+      ob.el.forEach((s, i) => { const e = (st.el || [])[i]; s.visible = !!e; if (e) s.position.set(e.x, e.y + 0.3, zf(i + 7)); });
+      const e = (st.el || [])[0]; e ? ob.aE.set([e.x, e.y + 0.45, zf(7)], [Math.max(-0.8, Math.min(0.8, e.vx * 0.25)), 0, 0], 'v อิเล็กตรอน') : ob.aE.hide();
+    }
+  },
   notes: ['แสงความยาวคลื่นยาวเกิน λ₀ ไม่ทำให้อิเล็กตรอนหลุด ไม่ว่าจะเข้มเท่าใด (อธิบายด้วยทฤษฎีคลื่นไม่ได้)', 'ความเข้มแสงเพิ่มจำนวนโฟตอน จึงเพิ่มกระแส แต่ไม่เพิ่มพลังงานจลน์สูงสุด', 'ความต่างศักย์หยุดยั้งขึ้นกับความถี่แสงและชนิดโลหะเท่านั้น']
 });
 
@@ -120,6 +156,24 @@ CASES.push({
       if (o.nm >= 380 && o.nm <= 750) { g.line(X(o.nm), 3.7, X(o.nm), 5.3, { c: '--ink', w: 3 }); g.text(X(o.nm), 3.2, fmt(o.nm) + ' nm', { fs: 11, b: true }); }
       else g.text(sx + sw / 2, 3.2, `${fmt(o.nm)} nm (${o.band} มองไม่เห็น)`, { fs: 11, b: true });
       g.text(sx + sw / 2, 6.3, `${o.kind}  อนุกรม${o.ser}`, { fs: 13, b: true });
+    }
+  },
+  three: {
+    cam() { return { pos: [0, 6, 9], target: [0, 0, 0] }; },
+    build(T, p, o) {
+      const nuc = T.sphere(0.22, '--pos', { emissive: '--pos', ei: 0.3 }); const rr = n => 0.35 * n * n * 0.42 + 0.3;   // รัศมีวงโคจร ∝ n² (ย่อสเกล)
+      for (let n = 1; n <= 7; n++) { const ring = T.torus(rr(n), n === p.ni || n === p.nf ? 0.025 : 0.01, n === p.ni || n === p.nf ? '--c4' : '--line'); ring.rotation.x = Math.PI / 2; if (n <= 4 || n === p.ni || n === p.nf) { const a = -0.5 - n * 0.32; T.label('n = ' + n, n === p.ni || n === p.nf ? '--c4' : '--muted', { pos: [rr(n) * Math.cos(a), 0, -rr(n) * Math.sin(a)] }); } }
+      const col = o.nm >= 380 && o.nm <= 750 ? wlColor(o.nm) : '#' + T.color('--muted').getHexString();
+      const wave = T.line('--c5', { max: 61 }); wave.material.color.set(col);
+      T.label(`${o.kind} · ${fmt(o.nm)} nm · ${o.band}`, '--ink', { pos: [0, 2.6, -rr(7)] });
+      return { rr, e: T.sphere(0.13, '--neg'), wave, jump: T.vec('--c4', null, { kind: 'v', r: 0.02, line: false }) };
+    },
+    update(ob, st, p) {
+      const f = clamp(st.t / 1.2, 0, 1), r = ob.rr(p.ni) + (ob.rr(p.nf) - ob.rr(p.ni)) * (p.ni === p.nf ? 0 : f), a = st.t * 2.2;
+      ob.e.position.set(r * Math.cos(a), 0, r * Math.sin(a));
+      p.ni !== p.nf && f < 1 ? ob.jump.set([ob.rr(p.ni) * Math.cos(a), 0.05, ob.rr(p.ni) * Math.sin(a)], [(ob.rr(p.nf) - ob.rr(p.ni)) * Math.cos(a), 0, (ob.rr(p.nf) - ob.rr(p.ni)) * Math.sin(a)]) : ob.jump.hide();
+      const emit = p.ni > p.nf, show = p.ni !== p.nf && (emit ? st.t > 1.2 : true); ob.wave.visible = show;
+      if (show) { const s = emit ? (st.t - 1.2) * 3 : 4 - st.t * 3, d = Math.max(0, s), pts = []; for (let i = 0; i <= 60; i++) { const x = r + 0.2 + d + i * 0.05; pts.push([x * Math.cos(a), 0.25 * Math.sin(i * 0.9), x * Math.sin(a)]); } ob.wave.set(pts); }
     }
   },
   notes: ['อนุกรมบัลเมอร์ (ลงมาที่ n = 2) มีเส้นที่ตามองเห็น 4 เส้น เส้นแดง 656 nm มาจาก 3 → 2', 'กระโดดลงมาที่ n = 1 (ไลแมน) ได้รังสีอัลตราไวโอเลตทั้งหมด', 'ระดับพลังงานยิ่งสูงยิ่งชิดกัน เข้าใกล้ 0 eV ซึ่งคือการแตกตัวเป็นไอออน']

@@ -40,6 +40,26 @@ CASES.push({
     }
   },
   plot: { series: [{ label: 'การกระจัดของจุดสีแดง', unit: 'cm', c: '--bad', f: (s, p, o) => { const t = s.t / p.slow, A = p.A, L = p.L, w = 2 * Math.PI * o.f; if (p.mode === 'st') { const xm = L / (2 * p.n) * 0.7; return A * Math.sin(p.n * Math.PI * xm / L) * Math.cos(w * t); } const xm = L * 0.3, k = 2 * Math.PI / o.lam; return xm <= o.v * t ? A * Math.sin(w * t - k * xm) : 0; } }] },
+  three: {
+    cam(p) { return { pos: [p.L * 0.5, p.L * 0.35, p.L * 0.95], target: [p.L * 0.5, 0, 0] }; },
+    build(T, p, o) {
+      const L = p.L, A = 0.16 * L * p.A / 10; T.floor(L * 3, { y: -L * 0.3, step: K.niceStep(L / 8) }).position.x = L / 2;
+      const post = x => { const b = T.box(0.04 * L, A * 3 + 0.02 * L, 0.06 * L, '--ground'); b.position.set(x, 0, 0); }; post(-0.03 * L); if (p.mode === 'st') post(L * 1.03);
+      const N = 48, beads = []; for (let i = 0; i <= N; i++) beads.push(T.sphere(0.008 * L, '--c1', { cast: false }));
+      if (p.mode === 'st') for (let i = 0; i <= p.n; i++) { const m = T.sphere(0.012 * L, '--c2'); m.position.set(i * L / p.n, 0, 0); }
+      return { A, N, beads, line: T.line('--c1', { max: 241 }), red: T.sphere(0.018 * L, '--bad'), aV: T.vec('--c3', 'v อนุภาค', { kind: 'v', r: 0.004 * L, pad: 0.03 * L }), aW: T.vec('--c2', 'คลื่นเคลื่อนที่', { kind: 'v', r: 0.004 * L, pad: 0.03 * L }) };
+    },
+    update(ob, st, p, o) {
+      const t = st.t / p.slow, A = ob.A, k = 2 * Math.PI / o.lam, w = 2 * Math.PI * o.f, L = p.L;
+      const y = x => p.mode === 'st' ? A * Math.sin(p.n * Math.PI * x / L) * Math.cos(w * t) : (x <= o.v * t ? A * Math.sin(w * t - k * x) : 0);
+      const vy = x => p.mode === 'st' ? -A * w * Math.sin(p.n * Math.PI * x / L) * Math.sin(w * t) : (x <= o.v * t ? A * w * Math.cos(w * t - k * x) : 0);
+      const pts = []; for (let i = 0; i <= 240; i++) { const x = L * i / 240; pts.push([x, y(x), 0]); } ob.line.set(pts);
+      ob.beads.forEach((b, i) => { const x = L * i / ob.N; b.position.set(x, y(x), 0); });
+      const xm = p.mode === 'st' ? L / (2 * p.n) * 0.7 : L * 0.3; ob.red.position.set(xm, y(xm), 0);
+      const vv = vy(xm), sc = A * 0.8 / Math.max(A * w, 1e-9); Math.abs(vv) > 1e-6 ? ob.aV.set([xm, y(xm), 0.02 * L], [0, vv * sc, 0], 'v อนุภาค') : ob.aV.hide();
+      p.mode === 'tr' ? ob.aW.set([L * 0.45, A * 1.8, 0], [L * 0.12, 0, 0], 'คลื่นเคลื่อนที่ v = ' + fmt(o.v) + ' m/s') : ob.aW.hide();
+    }
+  },
   notes: ['ดึงเชือกตึงขึ้น 4 เท่า อัตราเร็วคลื่นเพิ่ม 2 เท่า ความถี่ของทุกฮาร์มอนิกจึงเพิ่ม 2 เท่า', 'คลื่นนิ่งเกิดจากคลื่นเดินทางสวนกันซ้อนทับกัน บัพไม่ขยับเลย', 'อนุภาคของเชือกเคลื่อนที่ขึ้นลงเท่านั้น สิ่งที่เดินทางไปคือพลังงานและรูปคลื่น', 'ความถี่มูลฐาน (n = 1) ความยาวเชือกเท่ากับครึ่งความยาวคลื่น']
 });
 
@@ -126,6 +146,22 @@ CASES.push({
     }
   },
   actions: [{ label: '🔊 ฟังเสียงเทียบ', run(P) { playTones([P.f * P.v / (P.v - Math.min(0.95, P.vs) * P.v), P.f, P.f * P.v / (P.v + P.vs * P.v)]); } }],
+  three: {
+    cam() { return { pos: [0, 7, 10], target: [0, 0, 0] }; },
+    build(T, p, o) {
+      T.floor(18, { step: 1, y: -0.4 });
+      const geo = new T.THREE.BufferGeometry(), pts = []; for (let i = 0; i <= 72; i++) { const a = i / 72 * 2 * Math.PI; pts.push(Math.cos(a), 0, Math.sin(a)); } geo.setAttribute('position', new T.THREE.Float32BufferAttribute(pts, 3));
+      const rings = []; for (let i = 0; i < 40; i++) { const m = new T.THREE.LineBasicMaterial({ color: T.color('--c2'), transparent: true }); const l = new T.THREE.Line(geo, m); l.visible = false; T.scene.add(l); rings.push(l); }
+      const ear = (x, c) => { const s = T.sphere(0.25, '--c4'); s.position.set(x, 0, 0); return s; }; ear(7.5); ear(-7.5);
+      T.label('ด้านหน้า ' + (typeof o.ff === 'number' ? fmt(o.ff) + ' Hz' : o.ff), '--c1', { pos: [7.5, 0.8, 0] }); T.label('ด้านหลัง ' + fmt(o.fb) + ' Hz', '--c2', { pos: [-7.5, 0.8, 0] });
+      return { rings, src: T.sphere(0.25, '--c1'), aV: T.vec('--c1', 'vₛ', { kind: 'v', r: 0.04, pad: 0.3 }) };
+    },
+    update(ob, st, p) {
+      const fr = st.fronts || [], x = st.x != null ? st.x : -6;
+      ob.rings.forEach((l, i) => { const f = fr[fr.length - 1 - i]; if (!f) { l.visible = false; return; } const r = Math.max(1e-3, (st.t - f.t) * 3); l.visible = true; l.position.set(f.x, 0, 0); l.scale.set(r, 1, r); l.material.opacity = Math.max(0.15, 1 - r / 14); });
+      ob.src.position.set(x, 0, 0); p.vs > 0 ? ob.aV.set([x, 0.4, 0], [p.vs * 1.5, 0, 0], 'vₛ = ' + fmt(p.vs * p.v) + ' m/s') : ob.aV.hide();
+    }
+  },
   notes: ['ความถี่ของแหล่งกำเนิดไม่เปลี่ยน แต่ระยะห่างหน้าคลื่นที่ไปถึงผู้ฟังเปลี่ยน', 'ด้านหน้าหน้าคลื่นชิดกัน (λ สั้น ความถี่สูง) ด้านหลังห่างกัน', 'แหล่งกำเนิดเร็วเท่าเสียง หน้าคลื่นซ้อนกันที่หน้าแหล่ง เร็วกว่าเสียงเกิดกรวยมัค', 'กดปุ่มฟังเสียง: ได้ยินความถี่ด้านหน้า ความถี่จริง และด้านหลัง ตามลำดับ']
 });
 function playTones(fs) {

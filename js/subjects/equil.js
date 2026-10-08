@@ -228,6 +228,26 @@ CASES.push({
   },
   handles(p, o) { const r = o._r; return [{ id: 'x', x: p.x * r.u[0], y: p.x * r.u[1] - 0.72, set: (x, y) => ({ x: clamp(x * r.u[0] + (y + 0.72) * r.u[1], 0, p.L) }) }, { id: 'd', x: r.Pc[0], y: r.Pc[1], set: (x, y) => ({ d: clamp(x * r.u[0] + y * r.u[1], 0.2, p.L) }) }, { id: 'h', x: 0, y: p.h, set: (x, y) => ({ h: y }) }, { id: 'beta', x: p.L * r.u[0], y: p.L * r.u[1], set: (x, y) => ({ beta: clamp(Math.atan2(y, Math.max(0.05, x)) * DEG, -45, 60) }) }];
   },
+  three: {
+    cam(p) { return { pos: [p.L * 0.9, p.L * 0.45 + 0.6, p.L * 1.5 + 1.5], target: [p.L * 0.45, 0, 0] }; },
+    build(T, p, o) {
+      const r = o._r, u = r.u, L = p.L, tip = [L * u[0], L * u[1]], Ht = Math.max(p.h, L * u[1], 1) + 0.8, Hb = Math.min(-1.6, p.h - 0.4, L * u[1] - 1.4);
+      const wall = T.box(0.2, Ht - Hb, 1.6, '--ground'); wall.position.set(-0.1, (Ht + Hb) / 2, 0);
+      const bm = T.box(L, 0.12, 0.2, '--block2'); bm.position.set(tip[0] / 2, tip[1] / 2, 0); bm.rotation.z = Math.atan2(u[1], u[0]);
+      const hg = T.cyl(0.07, 0.07, 0.3, '--muted'); hg.rotation.x = Math.PI / 2;
+      T.line('--rope', { pts: [[r.Pc[0], r.Pc[1], 0], [r.A[0], r.A[1], 0]] }); const an = T.sphere(0.05, '--ink'); an.position.set(r.A[0], r.A[1], 0);
+      const lx = p.x * u[0], ly = p.x * u[1]; T.line('--rope', { pts: [[lx, ly, 0], [lx, ly - 0.5, 0]] }); const sign = T.box(0.7, 0.45, 0.06, '--c2'); sign.position.set(lx, ly - 0.72, 0);
+      T.label(p.m + ' kg', '--ink', { pos: [lx, ly - 0.72, 0.1] });
+      if (r.T > 0) {
+        const k = 1.3 / Math.max(r.T, r.H, (p.m + p.mb) * G), o3 = { r: 0.025, pad: 0.12 }, z = 0.18;
+        T.vec('--c3', '', o3).set([r.Pc[0], r.Pc[1], z], [r.Tx * k, r.Ty * k, 0], 'T ' + fmt(r.T) + ' N');
+        T.vec('--c4', '', o3).set([0, 0, z], [r.Hx * k, r.Hy * k, 0], 'H ' + fmt(r.H) + ' N');
+        if (p.mb > 0) T.vec('--c1', '', o3).set([L / 2 * u[0], L / 2 * u[1], z], [0, -p.mb * G * k, 0], 'W คาน');
+        T.vec('--c1', '', o3).set([lx, ly - 0.72, z], [0, -p.m * G * k, 0], 'W ป้าย ' + fmt(p.m * G) + ' N');
+      }
+      return {};
+    }
+  },
   notes: ['เชือกยิ่งเกือบขนานกับคาน (มุมเล็ก) แรงตึงยิ่งมาก เพราะแขนของโมเมนต์สั้น', 'ย้ายป้ายเข้าใกล้ผนัง แรงตึงลดลง', 'แรงที่บานพับไม่จำเป็นต้องอยู่ตามแนวคาน ยกเว้นคานไม่มีน้ำหนักและมีแรงกระทำที่ปลายเท่านั้น', 'ลากจุดยึดเชือกบนผนัง ลากจุดผูกบนคาน ลากป้าย หรือลากปลายคานเพื่อเปลี่ยนมุม']
 });
 
@@ -283,6 +303,26 @@ CASES.push({
     }
   },
   handles(p) { const th = p.th * RAD, sp = Math.min(p.s, p.L); return [{ id: 's', x: p.L * Math.cos(th) - sp * Math.cos(th), y: sp * Math.sin(th), set: (x, y) => ({ s: clamp(((p.L * Math.cos(th) - x) * Math.cos(th) + y * Math.sin(th)), 0, p.L) }) }, { id: 'top', x: 0, y: p.L * Math.sin(th), set: (x, y) => ({ th: clamp(Math.asin(clamp(y / p.L, 0.25, 0.996)) * DEG, 15, 85) }) }]; },
+  three: {
+    cam(p) { return { pos: [p.L * 1.3, p.L * 0.7, p.L * 1.3], target: [p.L * 0.35, p.L * 0.4, 0] }; },
+    build(T, p) {
+      T.floor(p.L * 4, { step: 0.5 }); const wall = T.box(0.2, p.L + 0.6, p.L * 1.6, '--ground'); wall.position.set(-0.1, (p.L + 0.6) / 2, 0);
+      const lad = T.group(), w = 0.45; [-1, 1].forEach(sd => { const rail = T.box(p.L, 0.06, 0.06, '--block2', { parent: lad }); rail.position.set(p.L / 2, 0, sd * w / 2); });
+      for (let k = 1; k < p.L * 3; k++) { const rg = T.cyl(0.02, 0.02, w, '--ink', { parent: lad }); rg.rotation.x = Math.PI / 2; rg.position.x = k / (p.L * 3) * p.L; }
+      const man = T.group(); const bd = T.cyl(0.13, 0.11, 0.55, '--c2', { parent: man }); bd.position.y = 0.6; const hd = T.sphere(0.12, '--block2', { parent: man }); hd.position.y = 1.0; const lg = T.cyl(0.08, 0.07, 0.35, '--ink', { parent: man }); lg.position.y = 0.17;
+      const o3 = { r: 0.025, pad: 0.12 };
+      return { lad, man, N1: T.vec('--c2', 'N₁', o3), f1: T.vec('--c3', 'f₁', o3), N2: T.vec('--c2', 'N₂', o3), f2: T.vec('--c3', 'f₂', o3), W: T.vec('--c1', 'W บันได', o3), Wm: T.vec('--c1', 'W คน', o3) };
+    },
+    update(ob, st, p) {
+      const c = Math.cos(st.th), s = Math.sin(st.th), bx = p.L * c, sp = Math.min(p.s, p.L);
+      ob.lad.position.set(bx, 0, 0); ob.lad.rotation.set(0, 0, Math.PI - st.th);
+      const P = [bx - sp * c, sp * s]; ob.man.visible = p.m > 0; ob.man.position.set(P[0] + 0.2, P[1], 0);
+      const r = ladder(Object.assign({}, p, { th: st.th * DEG, s: sp })), k = 1.4 / ((p.M + p.m) * G), z = 0.35;
+      const F = (a, o, d, m, t) => m > 1e-6 ? a.set([o[0], o[1], z], [d[0] * m * k, d[1] * m * k, 0], t + ' ' + fmt(m) + ' N') : a.hide();
+      F(ob.N1, [bx, 0], [0, 1], r.N1, 'N₁'); F(ob.f1, [bx, 0], [-1, 0], r.f1, 'f₁'); F(ob.N2, [0, p.L * s], [1, 0], r.N2, 'N₂'); F(ob.f2, [0, p.L * s], [0, 1], r.f2, 'f₂');
+      F(ob.W, [bx - p.L / 2 * c, p.L / 2 * s], [0, -1], p.M * G, 'W บันได'); F(ob.Wm, [P[0] + 0.2, P[1] + 0.6], [0, -1], p.m * G, 'W คน');
+    }
+  },
   notes: ['คนปีนสูงขึ้น โมเมนต์รอบฐานเพิ่ม N₂ และแรงเสียดทานที่ต้องการเพิ่ม บันไดจึงลื่นง่ายขึ้นเมื่อปีนสูง', 'มุมบันไดยิ่งต่ำ ยิ่งต้องการแรงเสียดทานมาก', 'ผนังมีแรงเสียดทานช่วยลดแรงเสียดทานที่พื้นต้องการ', 'ลากคนขึ้นลงตามบันได หรือลากปลายบนเพื่อเปลี่ยนมุม แอนิเมชันการลื่นเป็นภาพประกอบ ไม่ได้จำลองพลศาสตร์ครบถ้วน']
 });
 

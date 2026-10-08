@@ -46,6 +46,18 @@ K.car3d = (T, c, L = 4) => {
   [[-0.3, 1], [0.3, 1], [-0.3, -1], [0.3, -1]].forEach(([a, b]) => { const w = T.cyl(L * 0.11, L * 0.11, L * 0.08, '--ink', { parent: grp }); w.rotation.x = Math.PI / 2; w.position.set(a * L, L * 0.11, b * L * 0.23); });
   return grp;
 };
+// รอก 3D (แกนหมุนตามแกน z) p.spin(มุม) หมุนล้อ
+K.pulley3d = (T, R, x, y, z = 0, d = 0.12) => {
+  const g = T.group(); g.position.set(x, y, z);
+  const w = T.cyl(R, R, d, '--muted', { parent: g }); w.rotation.x = Math.PI / 2;
+  const sp = T.box(R * 1.8, R * 0.18, d * 1.1, '--ink', { parent: g }), sp2 = T.box(R * 0.18, R * 1.8, d * 1.1, '--ink', { parent: g });
+  const hub = T.cyl(R * 0.18, R * 0.18, d * 1.4, '--ink', { parent: g }); hub.rotation.x = Math.PI / 2;
+  g.spin = a => { g.rotation.z = a; }; return g;
+};
+// เพดานหรือที่ยึด
+K.ceil3d = (T, x0, x1, y, d = 1) => { const b = T.box(x1 - x0, 0.08, d, '--ink'); b.position.set((x0 + x1) / 2, y + 0.04, 0); return b; };
+// ตั้งตำแหน่งกล่องให้ฐานแนบผิวเอียงมุม th (cx, cy คือจุดศูนย์กลางในภาพ 2D)
+K.place3d = (m, cx, cy, th = 0, z = 0) => { m.position.set(cx, cy, z); m.rotation.set(0, 0, th); return m; };
 // ตัวสุ่มที่กำหนด seed ได้ (ผลซ้ำเดิมเมื่อ seed เดิม)
 K.rng = seed => { let a = (seed >>> 0) || 1; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
 K.gauss = r => { let u = 0, v = 0; while (u === 0) u = r(); v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };

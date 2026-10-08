@@ -140,6 +140,28 @@ CASES.push({
       g.text(gx + gw, gy - 0.4, 'เวลา (s) รวม ' + fmt(h.ttot) + ' s', { a: 'right', fs: 10, c: '--muted' });
     }
   },
+  three: {
+    cam() { return { pos: [1.1, 1.2, 2.4], target: [0.15, 0.55, 0] }; },
+    build(T) {
+      T.floor(4, { step: 0.25 }); const hp = T.cyl(0.42, 0.42, 0.08, '--ink'); hp.position.y = 0.04; const coil = T.torus(0.28, 0.02, '--c1', { emissive: '--c1', ei: 0.9 }); coil.rotation.x = Math.PI / 2; coil.position.y = 0.085;
+      const bk = T.cyl(0.35, 0.33, 0.9, '--water', { opacity: 0.12, cast: false }); bk.position.y = 0.09 + 0.45;
+      const wat = T.cyl(0.33, 0.31, 1, '--water', { opacity: 0.55, cast: false });
+      const ice = []; for (let k = 0; k < 6; k++) { const c = T.box(0.14, 0.12, 0.14, '--panel', { opacity: 0.85 }); c.position.set(-0.15 + (k % 3) * 0.15, 0.17 + Math.floor(k / 3) * 0.13, (k % 2) * 0.1 - 0.05); ice.push(c); }
+      const bub = [], stm = []; for (let k = 0; k < 10; k++) bub.push(T.sphere(0.02, '--panel', { opacity: 0.7, cast: false })); for (let k = 0; k < 8; k++) stm.push(T.sphere(0.06, '--line', { opacity: 0.5, cast: false }));
+      const th = T.cyl(0.02, 0.02, 1.1, '--panel', { opacity: 0.6, cast: false }); th.position.set(0.55, 0.7, 0); const col = T.cyl(0.012, 0.012, 1, '--bad');
+      return { wat, ice, bub, stm, col, lab: T.label('', '--ink'), st: T.label('', '--muted', { pos: [0, 1.35, 0] }) };
+    },
+    update(ob, st, p, o) {
+      const h = o._h, cur = Tof(h, st.E), T = cur.T, lab = cur.q.label, ice = lab.startsWith('น้ำแข็ง'), steam = lab.startsWith('ไอ'), boil = lab.includes('เดือด');
+      const iceFrac = lab.includes('ละลาย') ? 1 - cur.f : ice ? 1 : 0, water = steam ? 0 : boil ? 1 - cur.f : 1 - iceFrac, hw = 0.55 * water;
+      ob.wat.visible = hw > 0.005; ob.wat.scale.y = Math.max(hw, 1e-3); ob.wat.position.y = 0.09 + hw / 2;
+      ob.ice.forEach((c, k) => { c.visible = k < Math.round(6 * iceFrac); });
+      ob.bub.forEach((b, k) => { b.visible = boil && hw > 0.05; b.position.set(-0.22 + ((k * 0.37) % 0.44), 0.1 + ((k * 0.053 + st.t * 0.25) % Math.max(hw, 0.05)), ((k * 0.29) % 0.3) - 0.15); });
+      ob.stm.forEach((s, k) => { s.visible = steam || boil; s.position.set(-0.2 + k * 0.06, 1.05 + ((k * 0.13 + st.t * 0.3) % 0.4), 0); });
+      const ty = clamp((T + 40) / 180, 0, 1) * 1.05; ob.col.scale.y = Math.max(ty, 1e-3); ob.col.position.set(0.55, 0.15 + ty / 2, 0);
+      ob.lab.set(fmt(T) + ' °C', [0.75, 0.15 + ty, 0]); ob.st.set(lab, null);
+    }
+  },
   notes: ['ขณะเปลี่ยนสถานะ อุณหภูมิคงที่ ความร้อนที่ให้ไปใช้ทำลายพันธะระหว่างโมเลกุล', 'ช่วงเดือดยาวกว่าช่วงละลายประมาณ 6.8 เท่า (2.26×10⁶ ÷ 3.34×10⁵)', 'ความชันช่วงน้ำแข็งชันกว่าช่วงน้ำ เพราะ c ของน้ำแข็งน้อยกว่า', 'เพิ่มกำลังเครื่องให้ความร้อน รูปกราฟเหมือนเดิมแต่ใช้เวลาน้อยลง']
 });
 
@@ -193,6 +215,21 @@ CASES.push({
     }
   },
   plot: { overlay: true, yLabel: 'T (°C)', series: [{ label: 'T_A', unit: '°C', c: '--c1', f: s => s.TA }, { label: 'T_B', unit: '°C', c: '--c2', f: s => s.TB }] },
+  three: {
+    cam() { return { pos: [0, 1.3, 3.2], target: [0, 0.45, 0] }; },
+    build(T, p, o) {
+      T.floor(6, { step: 0.25 }); const a = T.box(0.8, 0.8, 0.8, '--c1'), b = T.box(0.8, 0.8, 0.8, '--c2'); a.position.set(-0.6, 0.4, 0); b.position.set(0.6, 0.4, 0);
+      a.material = a.material.clone(); b.material = b.material.clone();
+      const r = o._r; return { a, b, la: T.label('', '--ink'), lb: T.label('', '--ink'), q: T.vec('--c1', 'ความร้อน', { kind: 'v', r: 0.03, pad: 0.15 }), st: T.label('', '--ink', { pos: [0, 1.25, 0] }), c: [T.color('--c2'), T.color('--c3'), T.color('--c5'), T.color('--c1')], nA: MAT[r.A.mat][0], nB: MAT[r.B.mat][0] };
+    },
+    update(ob, st, p, o) {
+      const col = T => T > 60 ? ob.c[3] : T > 25 ? ob.c[2] : T > 0 ? ob.c[1] : ob.c[0];
+      ob.a.material.color.copy(col(st.TA)); ob.b.material.color.copy(col(st.TB));
+      ob.la.set(`A ${ob.nA} ${fmt(st.TA)} °C`, [-0.6, 0.95, 0]); ob.lb.set(`B ${ob.nB} ${fmt(st.TB)} °C`, [0.6, 0.95, 0]);
+      const d = st.TA - st.TB; Math.abs(d) > 0.05 ? ob.q.set([d > 0 ? -0.18 : 0.18, 0.4, 0.45], [d > 0 ? 0.36 : -0.36, 0, 0], 'ความร้อน') : ob.q.hide();
+      ob.st.set(st.f > 0.98 ? `สมดุลที่ ${fmt(o._r.Tf)} °C` : 'กำลังถ่ายเทความร้อน', null);
+    }
+  },
   notes: ['น้ำมีความจุความร้อนจำเพาะสูง อุณหภูมิสุดท้ายจึงมักใกล้อุณหภูมิของน้ำ', 'ใส่น้ำแข็งมาก ความร้อนจากน้ำไม่พอละลายทั้งหมด อุณหภูมิสุดท้ายหยุดที่ 0 °C', 'แบบจำลองไม่คิดความร้อนที่เสียให้ภาชนะและสิ่งแวดล้อม', 'ภาพแสดงการถ่ายเทแบบค่อยเป็นค่อยไปเพื่อให้เห็นทิศ ค่าสุดท้ายคำนวณจากสมดุลพลังงาน']
 });
 
@@ -229,6 +266,26 @@ CASES.push({
       g.wall(0, -0.6, -0.15, -1);
       g.path(curve(0.025), { c: '--c1', w: 7 }); g.path(curve(-0.025), { c: '--c2', w: 7 });
       g.text(0.6, -0.68, 'แผ่นโลหะคู่ (บน = โลหะ 1, ล่าง = โลหะ 2)', { fs: 11, c: '--muted' });
+    }
+  },
+  three: {
+    cam() { return { pos: [0.75, 0.7, 1.7], target: [0.65, -0.05, 0] }; },
+    build(T, p) {
+      const w1 = T.box(0.05, 0.5, 0.4, '--ground'); w1.position.set(-0.025, 0.28, 0); const w2 = T.box(0.05, 0.45, 0.4, '--ground'); w2.position.set(-0.025, -0.375, 0);
+      T.floor(4, { step: 0.1, y: -0.62 }).position.x = 0.7;
+      const r1 = T.box(1, 0.06, 0.06, '--c1'), r2 = T.box(1, 0.06, 0.06, '--c2'); const m = T.box(0.004, 0.45, 0.004, '--muted'); m.position.set(1, 0.28, 0.05); T.label('L₀', '--muted', { pos: [1, 0.55, 0] });
+      const N = 40, s1 = [], s2 = []; for (let i = 0; i < N; i++) { s1.push(T.box(1 / N + 0.002, 0.045, 0.12, '--c1')); s2.push(T.box(1 / N + 0.002, 0.045, 0.12, '--c2')); }
+      const fl = []; for (let i = 0; i < 5; i++) { const f = T.mesh(new T.THREE.ConeGeometry(0.03, 0.12, 12), '--c5', { emissive: '--c5', ei: 0.8, cast: false }); f.position.set(0.15 + i * 0.2, 0.05, 0); fl.push(f); }
+      return { r1, r2, s1, s2, N, fl, l1: T.label('', '--c1'), l2: T.label('', '--c2'), lb: T.label('แผ่นโลหะคู่ (บน = โลหะ 1, ล่าง = โลหะ 2)', '--muted', { pos: [0.6, -0.58, 0] }) };
+    },
+    update(ob, st, p, o) {
+      const s = st.f * p.ex / 1000 / p.L, l1 = 1 + o.d1 * s, l2 = 1 + o.d2 * s;
+      ob.r1.scale.x = l1; ob.r1.position.set(l1 / 2, 0.37, 0); ob.r2.scale.x = l2; ob.r2.position.set(l2 / 2, 0.19, 0);
+      ob.l1.set(`${ALPHA[p.a][0]} +${fmt(o.d1 * st.f)} mm`, [l1 + 0.12, 0.37, 0]); ob.l2.set(`${ALPHA[p.b][0]} +${fmt(o.d2 * st.f)} mm`, [l2 + 0.12, 0.19, 0]);
+      ob.fl.forEach((f, i) => { f.scale.y = 0.4 + st.f * (0.8 + 0.3 * Math.sin(st.t * 9 + i)); });
+      const k = (ALPHA[p.a][1] - ALPHA[p.b][1]) * p.dT * st.f * p.ex * 3, N = ob.N;
+      const P = (u, off) => { const th = k * u, x = Math.abs(k) < 1e-6 ? u : Math.sin(th) / k, y = Math.abs(k) < 1e-6 ? 0 : (1 - Math.cos(th)) / k; return [x - Math.sin(th) * off, -0.35 + y + Math.cos(th) * off, th]; };
+      for (let i = 0; i < N; i++) { const u = (i + 0.5) / N, a = P(u, 0.025), b = P(u, -0.025); ob.s1[i].position.set(a[0], a[1], 0); ob.s1[i].rotation.z = a[2]; ob.s2[i].position.set(b[0], b[1], 0); ob.s2[i].rotation.z = b[2]; }
     }
   },
   notes: ['โลหะที่ α มากขยายตัวมากกว่า แผ่นโลหะคู่จึงโค้งไปทางด้านโลหะที่ α น้อย', 'ทำให้เย็นลง (ΔT ติดลบ) แผ่นโค้งกลับทิศ หลักนี้ใช้ในเทอร์โมสตัท', 'การยืดจริงเล็กมาก ภาพขยายตามตัวเลือก "ขยายภาพการยืด"']

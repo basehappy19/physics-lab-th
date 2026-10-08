@@ -111,6 +111,28 @@ CASES.push({
     }
   },
   plot: { series: [{ label: 'แรงตึง/N', unit: 'N', c: '--c3', f: s => s.N }, { label: 'อัตราเร็ว', unit: 'm/s', c: '--c1', f: (s, p) => s.free ? Math.hypot(s.vx, s.vy) : Math.abs(s.w * p.R) }] },
+  three: {
+    cam(p) { return { pos: [p.R * 1.6, p.R * 0.6, p.R * 3.6], target: [0, -p.R * 0.1, 0] }; },
+    build(T, p) {
+      const R = p.R; T.floor(R * 6, { y: -R * 1.4, step: K.niceStep(R / 2) });
+      const post = T.box(R * 0.08, R * 1.4, R * 0.08, '--muted'); post.position.set(0, -R * 0.7, -R * 0.25);
+      const ax = T.cyl(R * 0.03, R * 0.03, R * 0.3, '--ink'); ax.rotation.x = Math.PI / 2; ax.position.z = -R * 0.12;
+      if (p.type === 'track') T.torus(R * 1.09, R * 0.05, '--ground'); else { const ring = []; for (let i = 0; i <= 96; i++) { const a = i / 96 * 2 * Math.PI; ring.push([R * Math.sin(a), -R * Math.cos(a), 0]); } T.line('--line', { pts: ring, max: 97 }); }
+      const o3 = { r: R * 0.012, pad: R * 0.1 };
+      return { link: p.type === 'rod' ? T.cyl(R * 0.02, R * 0.02, 1, '--block2') : T.line('--rope', { max: 2 }), ball: T.sphere(0.09 * R, '--c1'), tr: T.trail('--c1', 900),
+        aN: T.vec('--c3', p.type === 'track' ? 'N' : 'T', o3), aW: T.vec('--c1', 'mg', o3), aV: T.vec('--c2', 'v', Object.assign({ kind: 'v' }, o3)) };
+    },
+    update(ob, st, p, o) {
+      const R = p.R, P = [st.x, st.y, 0]; ob.ball.position.set(...P); if (st.t === 0) ob.tr.clear(); ob.tr.push(P);
+      if (p.type === 'rod') { const L = Math.hypot(st.x, st.y) || 1; ob.link.visible = !st.free; ob.link.scale.set(1, L, 1); ob.link.position.set(st.x / 2, st.y / 2, 0); ob.link.rotation.z = Math.atan2(st.y, st.x) - Math.PI / 2; }
+      else if (p.type === 'string') { ob.link.visible = !st.free; ob.link.set([[0, 0, 0], P]); } else ob.link.visible = false;
+      const k = R * 0.9 / Math.max(o._r.Nb, p.m * p.g, 1e-9), z = R * 0.1, Pz = [st.x, st.y, z];
+      if (!st.free && Math.abs(st.N) > 1e-6) ob.aN.set(Pz, [-st.x / R * st.N * k, -st.y / R * st.N * k, 0], (p.type === 'track' ? 'N ' : 'T ') + fmt(st.N) + ' N'); else ob.aN.hide();
+      ob.aW.set(Pz, [0, -p.m * p.g * k, 0], 'mg ' + fmt(p.m * p.g) + ' N');
+      const vx = st.free ? st.vx : st.w * R * Math.cos(st.phi), vy = st.free ? st.vy : st.w * R * Math.sin(st.phi), v = Math.hypot(vx, vy);
+      v > 1e-3 ? ob.aV.set([st.x, st.y, -z], [vx / Math.max(p.v0, 1e-6) * R * 0.6, vy / Math.max(p.v0, 1e-6) * R * 0.6, 0], 'v ' + fmt(v) + ' m/s') : ob.aV.hide();
+    }
+  },
   notes: ['แรงตึงมากที่สุดที่จุดต่ำสุด เพราะต้องทั้งรับน้ำหนักและให้แรงสู่ศูนย์กลาง', 'ที่จุดสูงสุดถ้าเชือกพอดีหย่อน (T = 0) น้ำหนักทำหน้าที่เป็นแรงสู่ศูนย์กลางพอดี v_top = √(gR)', 'แท่งแข็งดันได้ จึงครบรอบได้แม้ v_top = 0 แต่เชือกหย่อนแล้วมวลตกเป็นโพรเจกไทล์', 'ลองตั้ง v₀ ต่ำกว่าค่าต่ำสุดเล็กน้อย ดูจุดที่หลุดจากวง']
 });
 

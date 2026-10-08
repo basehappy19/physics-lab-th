@@ -101,6 +101,25 @@ CASES.push({
       if (f < 1) g.vec(xR, yr + 18, 0, -25, { px: true, c: '--c5', w: 3, label: 'กำลังเท' });
     }
   },
+  three: {
+    cam() { return { pos: [0.6, 0.9, 2.2], target: [0, 0.55, 0] }; },
+    build(T, p) {
+      const s = 0.02, r = 4 * s, xL = -14 * s, xR = 14 * s; T.floor(4, { step: 0.1, y: -0.02 });
+      const arm = x => { const c = T.cyl(r, r, 60 * s, '--water', { opacity: 0.1, cast: false }); c.position.set(x, 30 * s, 0); };
+      arm(xL); arm(xR); const bt = T.cyl(r, r, xR - xL, '--water', { opacity: 0.1, cast: false }); bt.rotation.z = Math.PI / 2; bt.position.set(0, 4 * s, 0);
+      const bw = T.cyl(r * 0.95, r * 0.95, xR - xL, '--water', { opacity: 0.5, cast: false }); bw.rotation.z = Math.PI / 2; bw.position.set(0, 4 * s, 0);
+      const col = (x, c, op) => T.cyl(r * 0.95, r * 0.95, 1, c, { opacity: op, cast: false });
+      const ln = T.line('--c4', { max: 2 }), lb = T.label('ระดับรอยต่อ: ความดันเท่ากัน', '--c4');
+      return { s, xL, xR, cL: col(xL, '--water', 0.5), cR: col(xR, '--water', 0.5), c2: col(xR, '--block2', 0.85), ln, lb, l1: T.label('', '--ink'), l2: T.label('', '--ink') };
+    },
+    update(ob, st, p, o) {
+      const s = ob.s, f = st.f, h2 = p.h2 * f, h1 = o._r2 * h2 / o._r1, base = 25, d = h1 / 2, yi = base - d, yl = base + d;
+      const set = (m, x, a, b) => { const h = Math.max(1e-3, b - a); m.visible = b - a > 1e-3; m.scale.set(1, h * s, 1); m.position.set(x, (a + h / 2) * s, 0); };
+      set(ob.cL, ob.xL, 8, yl); set(ob.cR, ob.xR, 8, yi); set(ob.c2, ob.xR, yi, yi + h2);
+      ob.ln.set([[ob.xL - 0.12, yi * s, 0], [ob.xR + 0.12, yi * s, 0]]); ob.lb.set(null, [0, yi * s + 0.05, 0.12]);
+      ob.l1.set(LIQ[p.l1][0] + ' h₁ ' + fmt(h1) + ' cm', [ob.xL - 0.15, yl * s + 0.06, 0]); ob.l2.visible = h2 > 0.5; ob.l2.set(LIQ[p.l2][0] + ' h₂ ' + fmt(h2) + ' cm', [ob.xR + 0.15, (yi + h2) * s + 0.06, 0]);
+    }
+  },
   notes: ['ของเหลวที่หนาแน่นน้อยกว่าต้องสูงกว่าจึงให้ความดันเท่ากันที่ระดับรอยต่อ', 'ความต่างระดับของผิวใช้หาความหนาแน่นของของเหลวที่ไม่ทราบค่าได้', 'ระดับที่สูงกว่ารอยต่อในแขนซ้ายไม่ใช่ระดับที่ความดันเท่ากัน เพราะอยู่ในของเหลวต่างชนิดกับแขนขวา']
 });
 

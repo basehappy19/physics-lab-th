@@ -297,8 +297,9 @@ const Lab = (function () {
     $('#sensHint').innerHTML = 'อ่านตามแถว: เมื่อ <b>เพิ่ม</b>ตัวแปรในแถวทีละ 10% (ตัวแปรอื่นคงที่ ณ ค่าปัจจุบัน) ค่าในแต่ละคอลัมน์จะ ↑ เพิ่ม ↓ ลด หรือ – ไม่เปลี่ยน';
     const isSim = !!(c.sim || c.three);
     $('#viewer').classList.toggle('is-sim', isSim);
-    $('#svg').toggleAttribute('hidden', isSim); $('#cv').hidden = !isSim; $('#v3host').hidden = true;
-    view = c.sim && c.sim.draw ? '2d' : (c.three && HAS3 ? '3d' : '2d');
+    const isSvg = !c.sim && !!c.draw;   // ภาพนิ่ง SVG (อาจมี 3D ให้สลับดู)
+    $('#svg').toggleAttribute('hidden', !isSvg); $('#cv').hidden = isSvg || !isSim; $('#v3host').hidden = true;
+    view = (c.sim && c.sim.draw) || isSvg ? '2d' : (c.three && HAS3 ? '3d' : '2d');
     if (V3) V3.resetCam();
     playing = !!(c.sim && c.sim.step && c.sim.autoplay !== false);
     renderToolbar();
@@ -313,7 +314,7 @@ const Lab = (function () {
   function renderToolbar() {
     const c = cur, hasStep = !!(c.sim && c.sim.step);
     $('#vbar').hidden = !(c.sim || c.three);
-    $('#vbar').innerHTML = (c.three && HAS3 && c.sim && c.sim.draw ? `<div class="seg sm" id="vmode"><button data-v="2d" aria-pressed="${view === '2d'}">2D</button><button data-v="3d" aria-pressed="${view === '3d'}">3D</button></div>` : (c.three && HAS3 ? '<span class="tag">3D</span>' : '')) +
+    $('#vbar').innerHTML = (c.three && HAS3 && ((c.sim && c.sim.draw) || (!c.sim && c.draw)) ? `<div class="seg sm" id="vmode"><button data-v="2d" aria-pressed="${view === '2d'}">2D</button><button data-v="3d" aria-pressed="${view === '3d'}">3D</button></div>` : (c.three && HAS3 ? '<span class="tag">3D</span>' : '')) +
       (hasStep ? `<button class="pb" id="play" aria-label="เล่น/หยุด"></button><button class="pb" id="restart" title="เริ่มใหม่">↺</button>` +
         `<label class="spd">ความเร็ว <select id="speed">${[0.1, 0.25, 0.5, 1, 2, 4].map(v => `<option value="${v}" ${v === speed ? 'selected' : ''}>${v}×</option>`).join('')}</select></label><span class="tm" id="tm"></span>` : '') +
       (c.actions || []).map((a, k) => `<button class="act" data-act="${k}">${a.label}</button>`).join('') +
@@ -360,7 +361,7 @@ const Lab = (function () {
     const w = c.check ? c.check(P, O) : [];
     $('#warn').innerHTML = w.map(s => `<div class="warn">${s}</div>`).join('');
     if (c.sim || c.three) rebuildSim();
-    else { let svg = c.draw(P, O); if (c.box) { const k = Math.min(640 / c.box[0], 300 / c.box[1]); svg = `<g transform="translate(${(640 - c.box[0] * k) / 2},${(300 - c.box[1] * k) / 2}) scale(${k})">${svg}</g>`; } $('#svg').innerHTML = svg; }
+    if (!c.sim && c.draw) { let svg = c.draw(P, O); if (c.box) { const k = Math.min(640 / c.box[0], 300 / c.box[1]); svg = `<g transform="translate(${(640 - c.box[0] * k) / 2},${(300 - c.box[1] * k) / 2}) scale(${k})">${svg}</g>`; } $('#svg').innerHTML = svg; }
     const ex = c.extra ? c.extra(P, O) : null;
     $('#extraCard').hidden = !ex; if (ex) { $('#extraTitle').textContent = ex.title; $('#extra').innerHTML = ex.html; }
     sens();
@@ -396,7 +397,9 @@ const Lab = (function () {
     const asp = cur.aspect || (cur.sim && cur.sim.aspect) || 16 / 9;
     let h = Math.round(w / asp); h = clamp(h, 220, Math.max(260, Math.round(window.innerHeight * 0.68)));
     const show3 = !!(view === '3d' && cur.three && HAS3), v3 = show3 ? ensure3() : null;
-    $('#cv').hidden = show3; $('#v3host').hidden = !show3;
+    const isSvg = !cur.sim && !!cur.draw;
+    $('#cv').hidden = show3 || isSvg; $('#v3host').hidden = !show3; $('#svg').toggleAttribute('hidden', !isSvg || show3);
+    if (isSvg && !show3) return;
     if (show3) { if (v3) v3.resize(w, h); $('#v3host').style.height = h + 'px'; } else G.resize(w, h);
     if (GR) GR.dirty = true;
     const gc = $('#gcv'); if (cur.plot && !$('#graphCard').hidden) { GR.g.resize(gc.parentElement.clientWidth, cur.plot.h || Math.max(160, Math.min(320, (cur.plot.x ? 1 : cur.plot.series.length) * 95))); }

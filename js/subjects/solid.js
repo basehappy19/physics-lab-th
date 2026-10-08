@@ -110,6 +110,27 @@ CASES.push({
       g.textPx(12, 22, `แขวน ${st.cnt || 0} ก้อน  F = ${fmt(st.F || 0)} N  ยืด ${fmt((st.x || 0) * 100)} cm` + (st.perm > 0 ? '  (เลยขีดจำกัด ยืดถาวร)' : ''), { a: 'left', fs: 13, b: true, c: st.perm > 0 ? '--bad' : '--ink' });
     }
   },
+  three: {
+    cam() { return { pos: [1.7, 1.7, 3.1], target: [0, 1.25, 0] }; },
+    build(T, p, o) {
+      K.ceil3d(T, -0.6, 0.6, 2.2, 0.5); T.floor(4, { step: 0.1 });
+      const ruler = T.box(0.04, 2.1, 0.01, '--block2'); ruler.position.set(0.35, 1.15, 0); for (let i = 0; i <= 20; i++) { const t = T.box(i % 5 ? 0.02 : 0.04, 0.004, 0.012, '--ink'); t.position.set(0.33, 0.1 + i * 0.1, 0.006); }
+      const L0 = 0.7, mark = T.box(0.16, 0.006, 0.02, '--muted'); mark.position.set(0.3, 2.2 - L0, 0); T.label('ยาวเดิม', '--muted', { pos: [0.55, 2.2 - L0, 0] });
+      const n = Math.max(1, p.n), ms = []; for (let i = 0; i < n; i++) ms.push(T.cyl(0.08, 0.08, 0.05, '--c2'));
+      const o3 = { r: 0.01, pad: 0.06 };
+      return { L0, ms, spr: T.spring('--spring', { coils: 16, r: 0.05 }), hook: T.cyl(0.006, 0.006, 1, '--ink'), aS: T.vec('--c4', 'kx', o3), aW: T.vec('--c1', 'W', o3), xmaxv: (p.Fe / p.k + Math.max(0, o.Fmax - p.Fe) / p.k * 2.5) * 1.2 || 0.1, lab: T.label('', '--ink'), cBad: T.color('--bad'), cSpr: T.color('--spring') };
+    },
+    update(ob, st, p, o) {
+      const sc = Math.min(1.0 / ob.xmaxv, 8), y1 = 2.2 - ob.L0 - (st.x || 0) * sc, n = st.cnt || 0;
+      ob.spr.set2([0, 2.2, 0], [0, y1, 0]); ob.spr.material.color.copy(st.perm > 0 ? ob.cBad : ob.cSpr);
+      ob.hook.scale.set(1, 0.06, 1); ob.hook.position.set(0, y1 - 0.03, 0);
+      ob.ms.forEach((m, i) => { m.visible = i < n; m.position.set(0, y1 - 0.085 - i * 0.052, 0); });
+      const F = st.F || 0, k = 0.5 / Math.max(o.Fmax, 1e-9);
+      F > 1e-6 ? ob.aS.set([0.12, y1, 0.09], [0, F * k, 0], 'แรงสปริง ' + fmt(F) + ' N') : ob.aS.hide();
+      F > 1e-6 ? ob.aW.set([-0.12, y1 - 0.06 - n * 0.026, 0.09], [0, -F * k, 0], 'W ' + fmt(F) + ' N') : ob.aW.hide();
+      ob.lab.set(`ยืด ${fmt((st.x || 0) * 100)} cm` + (st.perm > 0 ? ' (ยืดถาวร)' : ''), [-0.35, y1, 0]);
+    }
+  },
   notes: ['ภายในขีดจำกัด จุดขาขึ้นและขาลงทับกันเป็นเส้นตรงเส้นเดียว', 'เลยขีดจำกัด สปริงยืดมากขึ้นผิดสัดส่วน และเมื่อปลดน้ำหนักหมดยังเหลือระยะยืดถาวร', 'ลด k (สปริงอ่อน) จะยืดมากกว่าภายใต้แรงเท่ากัน']
 });
 

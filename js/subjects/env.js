@@ -155,6 +155,22 @@ CASES.push({
       g.textPx(12, 22, `แสงอาทิตย์ (เหลือง) ${fmt(p.alb * 100)}% สะท้อนกลับ  อินฟราเรด (แดง) ${fmt(p.eps * 100)}% ถูกบรรยากาศดูดกลืน`, { a: 'left', fs: 12, b: true, bg: true });
     }
   },
+  three: {
+    cam() { return { pos: [8, 6.5, 15], target: [8, 3.6, 0] }; },
+    build(T, p, o) {
+      const gr = T.box(16, 1.2, 6, '--c3', { opacity: 0.55, receive: true }); gr.position.set(8, 0.6, 0);
+      const at = T.box(16, 0.8, 6, '--c4', { opacity: 0.06 + 0.3 * p.eps, cast: false }); at.position.set(8, 3.6, 0);
+      const sun = T.sphere(0.7, '--c5', { emissive: '--c5', ei: 1, cast: false }); sun.position.set(15.3, 8.3, -1);
+      T.label('ผิวโลก ' + fmt(o.Ts) + ' °C', '--ink', { pos: [13.5, 1.5, 3] }); T.label('บรรยากาศ (ก๊าซเรือนกระจก)', '--muted', { pos: [13, 4.3, 3] });
+      // โฟตอนทั้งหมดใช้ InstancedMesh สองก้อน (แสงอาทิตย์ / อินฟราเรด)
+      const mk = (c, r) => { const m = new T.THREE.InstancedMesh(new T.THREE.SphereGeometry(r, 10, 8), new T.THREE.MeshStandardMaterial({ color: T.color(c), emissive: T.color(c), emissiveIntensity: 0.5 }), 400); m.count = 0; T.scene.add(m); return m; };
+      return { sunM: mk('#f5c518', 0.12), irM: mk('--bad', 0.1), M: new T.THREE.Matrix4() };
+    },
+    update(ob, st) {
+      let a = 0, b = 0; (st.ph || []).forEach((q, i) => { const z = ((i * 0.618) % 1 - 0.5) * 4.5; ob.M.setPosition(q.x, q.y, z); if (q.k === 'sun' || q.k === 'ref') { if (a < 400) ob.sunM.setMatrixAt(a++, ob.M); } else if (b < 400) ob.irM.setMatrixAt(b++, ob.M); });
+      ob.sunM.count = a; ob.irM.count = b; ob.sunM.instanceMatrix.needsUpdate = true; ob.irM.instanceMatrix.needsUpdate = true;
+    }
+  },
   notes: ['ถ้าไม่มีบรรยากาศ ผิวโลกจะเย็นประมาณ −18 °C ก๊าซเรือนกระจกทำให้อุ่นขึ้นราว 33 °C จนเหมาะกับสิ่งมีชีวิต', 'เพิ่มการดูดกลืนรังสีอินฟราเรด (ก๊าซเรือนกระจกมากขึ้น) อุณหภูมิผิวสูงขึ้น', 'น้ำแข็งที่ขั้วโลกละลาย อัลบีโดลด โลกดูดกลืนแสงมากขึ้น ยิ่งร้อนขึ้น (ป้อนกลับเชิงบวก)', 'แบบจำลองบรรยากาศชั้นเดียวนี้ง่ายกว่าความจริงมาก ใช้ดูแนวโน้ม']
 });
 

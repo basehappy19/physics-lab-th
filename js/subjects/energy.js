@@ -137,6 +137,26 @@ CASES.push({
   handles(p) { return [{ id: 'x', x: -p.x + 0.15, y: 0.12, set: x => ({ x: clamp(-(x - 0.15), 0.02, 0.8) }) }]; },
   plot: { overlay: true, yLabel: 'พลังงาน (J)', series: [{ label: 'สปริง', unit: 'J', c: '--c4', f: (s, p) => s.s < 0 ? 0.5 * p.k * s.s * s.s : 0 }, { label: 'Eₖ', unit: 'J', c: '--c1', f: (s, p) => 0.5 * p.m * s.v * s.v }, { label: 'Eₚ', unit: 'J', c: '--c2', f: (s, p) => s.s > p.d ? p.m * 9.8 * pathPos(p, s.s).y : 0 }, { label: 'Q', unit: 'J', c: '--c5', f: s => s.Q }] },
   live: [{ name: 'v', unit: 'm/s', f: s => s.v }, { name: 'Q', unit: 'J', f: s => s.Q }],
+  three: {
+    cam(p) { const th = p.th * RAD, Xe = p.d + p.Li * Math.cos(th); return { pos: [(Xe - 1.2) / 2 - 0.5, 1.2 + p.Li * Math.sin(th) * 0.35, Xe * 0.5 + 1.6], target: [(Xe - 1.2) / 2, 0.5, 0] }; },
+    build(T, p) {
+      const th = p.th * RAD, Xe = p.d + p.Li * Math.cos(th), Ye = p.Li * Math.sin(th);
+      T.floor(Math.max(10, Xe * 2.4), { step: 0.5 }).position.x = Xe / 2; T.extrude([[p.d, 0], [Xe, 0], [Xe, Ye]], 0.8, '--block2', { receive: true });
+      const wall = T.box(0.1, 0.8, 0.8, '--ground'); wall.position.set(-1.25, 0.4, 0);
+      const o3 = { r: 0.012, pad: 0.08 };
+      return { blk: T.box(0.3, 0.24, 0.3, '--c2'), spr: T.spring('--spring', { coils: 12, r: 0.07 }), aV: T.vec('--c1', 'v', Object.assign({ kind: 'v' }, o3)), aS: T.vec('--c4', 'kx', o3), aW: T.vec('--c5', 'mg', o3), aF: T.vec('--c3', 'f', o3), aN: T.vec('--c2', 'N', o3) };
+    },
+    update(ob, st, p) {
+      const bw = 0.3, bh = 0.24, q = pathPos(p, Math.max(0, st.s)), c = Math.cos(q.ang), s = Math.sin(q.ang);
+      const cx = (st.s < 0 ? st.s : q.x) + c * bw / 2 - s * bh / 2, cy = (st.s < 0 ? 0 : q.y) + s * bw / 2 + c * bh / 2;
+      K.place3d(ob.blk, cx, cy, q.ang); ob.spr.set2([-1.2, bh / 2, 0], [Math.min(st.s, 0), bh / 2, 0]);
+      const W = p.m * 9.8, Fs = st.s < 0 ? -p.k * st.s : 0, N = W * c, fr = p.mu * N, k = 0.7 / Math.max(W, p.k * p.x), P = [cx, cy, 0.17];
+      ob.aW.set(P, [0, -W * k, 0], 'mg'); ob.aN.set(P, [-s * N * k, c * N * k, 0], 'N');
+      Fs > 0 ? ob.aS.set(P, [Fs * k, 0, 0], 'kx ' + fmt(Fs) + ' N') : ob.aS.hide();
+      (Math.abs(st.v) > 1e-3 && fr > 0) ? ob.aF.set([cx, cy - bh / 2 * c, 0.17], [-sgn(st.v) * c * fr * k, -sgn(st.v) * s * fr * k, 0], 'f') : ob.aF.hide();
+      Math.abs(st.v) > 1e-3 ? ob.aV.set([cx, cy + 0.2, -0.17], [c * st.v * 0.12, s * st.v * 0.12, 0], 'v ' + fmt(Math.abs(st.v)) + ' m/s') : ob.aV.hide();
+    }
+  },
   notes: ['อัดสปริงเพิ่มเป็น 2 เท่า พลังงานในสปริงเพิ่มเป็น 4 เท่า', 'ลากกล่องไปทางซ้ายเพื่อเปลี่ยนระยะอัดสปริง', 'แรงเสียดทานบนพื้นเอียงน้อยกว่าบนพื้นราบเพราะ N = mg cos θ']
 });
 
@@ -238,6 +258,50 @@ CASES.push({
         const L = Px(xl); g.box(L[0], L[1] + 0.35, 0.7, 0.55, phi, { fill: '--c2', label: p.M + ' kg', fs: 10 });
         const E = Px(xe); g.vec(E[0], E[1] + (p.cls === '3' ? -0.1 : 0.1), 0, (p.cls === '3' ? 1 : -1) * 55, { px: true, c: '--c4', w: 3, label: 'E ' + fmt(o.E) + ' N' });
         g.text(0.4, 3.9, `คานอันดับ ${p.cls}   IMA = ${fmt(o.IMA)}`, { a: 'left', fs: 13, b: true });
+      }
+    }
+  },
+  three: {
+    cam(p) { return p.type === 'pulley' ? { pos: [2.2, 3.2, 6.4], target: [0, 2.4, 0] } : { pos: [4.6, 3.2, 8.2], target: [4.4, 1.2, 0] }; },
+    build(T, p, o) {
+      const ob = { o3: { r: 0.03, pad: 0.15 } }; T.floor(14, { step: 0.5 }).position.x = p.type === 'pulley' ? 0 : 4.4;
+      if (p.type === 'pulley') {
+        const n = p.n, top = 4.8, R = 0.22, nu = Math.max(1, Math.ceil(n / 2)), nl = Math.floor(n / 2), xs = []; for (let i = 0; i < n; i++) xs.push(-0.9 + i * 0.36);
+        const xe = xs[n - 1] + 0.36; Object.assign(ob, { n, top, R, xs, xe, nl });
+        K.ceil3d(T, -2.5, 2.8, top + 0.25, 1.2);
+        const tb = T.box(xe - xs[0] + 0.5, 0.45, 0.4, '--block'); tb.position.set((xs[0] + xe) / 2, top - 0.225, 0);
+        ob.up = []; for (let i = 0; i < nu; i++) ob.up.push(K.pulley3d(T, R, xs[0] + 0.18 + i * 0.72, top - 0.22, 0.26, 0.08));
+        ob.ropes = []; for (let i = 0; i <= n; i++) ob.ropes.push(T.line('--rope', { max: 2 }));
+        ob.low = T.group(); if (n > 1) { const lb = T.box(xs[n - 1] - xs[0] + 0.4, 0.38, 0.4, '--block', { parent: ob.low }); lb.position.set((xs[0] + xs[n - 1]) / 2, 0.19, 0); for (let i = 0; i < Math.max(1, nl); i++) { const pw = K.pulley3d(T, R * 0.9, xs[0] + 0.18 + i * 0.72, 0.19, 0.26, 0.08); ob.low.add(pw); } }
+        ob.load = T.box(0.9, 0.6, 0.6, '--c2'); ob.hook = T.line('--ink', { max: 2 });
+      } else {
+        const a = p.a, b = p.b, Lt = a + b, scale = 8 / Lt; let xf, xl, xe;
+        if (p.cls === '1') { xe = 0; xf = a; xl = a + b; } else if (p.cls === '2') { xf = 0; xl = b; xe = a + b; } else { xf = 0; xe = a; xl = a + b; }
+        Object.assign(ob, { scale, xf, xl, xe, x0: Math.min(xe, xl, xf) - 0.2, x1: Math.max(xe, xl, xf) + 0.2 });
+        T.extrude([[0.4 + xf * scale - 0.3, 0], [0.4 + xf * scale + 0.3, 0], [0.4 + xf * scale, 1.2]], 0.6, '--c6');
+        ob.beam = T.box((ob.x1 - ob.x0) * scale, 0.12, 0.5, '--block2'); ob.load = T.box(0.7, 0.55, 0.5, '--c2');
+      }
+      ob.aE = T.vec('--c4', 'E', ob.o3); ob.aW = T.vec('--c1', 'W', ob.o3); ob.lab = T.label('', '--ink');
+      return ob;
+    },
+    update(ob, st, p, o) {
+      const k = 1.0 / Math.max(o._W, o.E), z = 0.4;
+      if (p.type === 'pulley') {
+        const yl = 0.9 + st.f * p.h * 0.6, n = ob.n, xs = ob.xs, top = ob.top, R = ob.R, ye = 1.6 - st.f * 0.5;
+        for (let i = 0; i < n; i++) ob.ropes[i].set([[xs[i], top - R, 0], [xs[i], yl + 0.55, 0]]);
+        ob.ropes[n].set([[ob.xe, top - R, 0], [ob.xe, ye, 0]]);
+        ob.up.forEach(w => w.spin(-st.f * 20)); ob.low.position.y = n > 1 ? yl + 0.55 : -50;
+        const cx = (xs[0] + xs[n - 1]) / 2; ob.load.position.set(cx, yl + 0.1, 0); ob.hook.set([[cx, yl + 0.55, 0], [cx, yl + 0.4, 0]]);
+        ob.aE.set([ob.xe, ye, z], [0, -o.E * k, 0], 'E ' + fmt(o.E) + ' N'); ob.aW.set([cx, yl + 0.1, z], [0, -o._W * k, 0], 'W ' + fmt(o._W) + ' N');
+        ob.lab.set(`ดึงเชือก ${fmt(o.dE * st.f)} m · ของขึ้น ${fmt(p.h * st.f)} m`, [2.2, 4.0, 0]);
+      } else {
+        const sc = ob.scale, phi = -st.f * Math.atan2(Math.min(p.h, 1.2), Math.max(p.b, 0.1)) * (p.cls === '3' ? -1 : 1) * 0.5;
+        const Px = x => [0.4 + ob.xf * sc + (x - ob.xf) * sc * Math.cos(phi), 1.2 + (x - ob.xf) * sc * Math.sin(phi)];
+        const m = Px((ob.x0 + ob.x1) / 2); ob.beam.position.set(m[0], m[1] + 0.06, 0); ob.beam.rotation.z = phi;
+        const L = Px(ob.xl); K.place3d(ob.load, L[0] - Math.sin(phi) * 0.4, L[1] + Math.cos(phi) * 0.4, phi);
+        const E = Px(ob.xe), up = p.cls === '3';
+        ob.aE.set([E[0], E[1] + (up ? -0.1 : 0.15), z], [0, (up ? 1 : -1) * o.E * k, 0], 'E ' + fmt(o.E) + ' N'); ob.aW.set([L[0], L[1] + 0.2, z], [0, -o._W * k, 0], 'W ' + fmt(o._W) + ' N');
+        ob.lab.set(`คานอันดับ ${p.cls} · IMA = ${fmt(o.IMA)}`, [0.4 + ob.xf * sc, 3.4, 0]);
       }
     }
   },

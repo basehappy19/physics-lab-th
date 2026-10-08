@@ -154,6 +154,25 @@ CASES.push({
     }
   },
   handles(p) { return [{ id: 'xr', x: p.xr, y: p.H * 0.5, set: x => ({ xr: clamp(x, 0, 3000) }) }, { id: 'xt', x: p.xt, y: 0, set: x => ({ xt: clamp(x, 100, 3000) }) }]; },
+  three: {
+    cam(p, o) { const x0 = Math.min(0, p.xr - 50) - p.H * 0.2, x1 = Math.max(p.xt, o.land) + p.H * 0.4, W = x1 - x0; return { pos: [(x0 + x1) / 2 - W * 0.05, p.H * 0.75, W * 0.62], target: [(x0 + x1) / 2, p.H * 0.45, 0] }; },
+    build(T, p, o) {
+      const x0 = Math.min(0, p.xr - 50) - p.H * 0.2, x1 = Math.max(p.xt, o.land) + p.H * 0.4, W = x1 - x0, sz = W * 0.045;
+      const gr = T.box(W * 1.4, 1, W * 0.6, '--ground', { receive: true, cast: false }); gr.position.set((x0 + x1) / 2, -0.5, 0);
+      const tg = T.cyl(sz * 0.8, sz * 0.8, sz * 0.05, '--bad'); tg.position.set(p.xt, 0.2, 0); T.label('เป้า', '--bad', { pos: [p.xt, sz * 0.6, 0] });
+      T.line('--muted', { pts: [[p.xr, 0, 0], [p.xr, p.H, 0]], dash: sz * 0.2, opacity: 0.6 }); T.label('จุดปล่อย', '--muted', { pos: [p.xr, p.H * 1.08, 0] });
+      const pl = T.group(), fu = T.cyl(sz * 0.18, sz * 0.12, sz * 2.2, '--c2', { parent: pl }); fu.rotation.z = Math.PI / 2;
+      const wg = T.box(sz * 0.5, sz * 0.05, sz * 2.2, '--c2', { parent: pl }); wg.position.x = sz * 0.1; const tl = T.box(sz * 0.3, sz * 0.5, sz * 0.05, '--c2', { parent: pl }); tl.position.set(-sz * 1, sz * 0.25, 0); const ts = T.box(sz * 0.25, sz * 0.04, sz * 0.8, '--c2', { parent: pl }); ts.position.set(-sz * 1, sz * 0.05, 0);
+      const o3 = { kind: 'v', r: sz * 0.04, pad: sz * 0.3 };
+      return { pl, sz, bag: T.box(sz * 0.3, sz * 0.3, sz * 0.3, '--c1'), tr: T.trail('--c1', 3000), drop: T.line('--muted', { max: 2, dash: sz * 0.1 }), aV: T.vec('--c1', 'v', o3), aP: T.vec('--c2', 'u', o3), kv: sz * 2.5 / Math.max(p.u, 1) };
+    },
+    update(ob, st, p) {
+      ob.pl.position.set(st.xp, p.H + ob.sz * 0.2, 0); ob.aP.set([st.xp, p.H + ob.sz * 0.9, 0], [p.u * ob.kv, 0, 0], 'u ' + fmt(p.u) + ' m/s');
+      ob.bag.visible = st.rel; if (st.t === 0) ob.tr.clear();
+      if (st.rel) { ob.bag.position.set(st.bx, st.by + ob.sz * 0.15, 0); ob.tr.push([st.bx, Math.max(0, st.by), 0]); ob.drop.visible = true; ob.drop.set([[st.xp, p.H, 0], [st.bx, st.by, 0]]); if (st.by > 0) ob.aV.set([st.bx, st.by, ob.sz * 0.3], [p.u * ob.kv, st.bvy * ob.kv, 0], 'v ' + fmt(Math.hypot(p.u, st.bvy)) + ' m/s'); else ob.aV.hide(); }
+      else { ob.drop.visible = false; ob.aV.hide(); }
+    }
+  },
   notes: ['ถุงอยู่ใต้เครื่องบินตลอดเวลา (เส้นประจางๆ แนวดิ่ง) เพราะความเร็วแนวระดับเท่ากัน', 'บินสูงขึ้น 4 เท่า เวลาตกเพิ่มเพียง 2 เท่า', 'ลากเส้นจุดปล่อยหรือลากเป้าเพื่อเล็งเอง']
 });
 
@@ -185,6 +204,25 @@ CASES.push({
       g.line(p.D, p.H, p.D, st.my, { c: '--c4', w: 1, dash: [2, 3] });
       const drop = p.H - st.my; if (drop > 0.1) g.text(p.D + 1.8, (p.H + st.my) / 2, 'ตก ' + fmt(drop) + ' m', { a: 'left', fs: 11, c: '--c4', base: 'middle' });
       if (st.done) g.textPx(12, 22, o.ok, { a: 'left', fs: 14, b: true, c: o.y >= 0 ? '--good' : '--bad' });
+    }
+  },
+  three: {
+    cam(p) { return { pos: [p.D * 0.35, p.H * 0.7, p.D * 1.15 + 6], target: [p.D * 0.55, p.H * 0.45, 0] }; },
+    build(T, p) {
+      T.floor(Math.max(30, p.D * 2.4), { step: K.niceStep(p.D / 6) }).position.x = p.D / 2;
+      const tr = T.cyl(0.5, 0.6, p.H + 2, '--block2'); tr.position.set(p.D + 1, (p.H + 2) / 2, 0);
+      const br = T.cyl(0.15, 0.2, 1.8, '--block2'); br.rotation.z = Math.PI / 2 - 0.3; br.position.set(p.D + 0.2, p.H + 0.6, 0);
+      const crown = T.sphere(2.2, '--c3', { opacity: 0.85 }); crown.position.set(p.D + 1, p.H + 2.6, 0);
+      T.line('--muted', { pts: [[0, 0, 0], [p.D, p.H, 0]], dash: 0.4 }); const gun = T.cyl(0.08, 0.1, 1.2, '--ink'); gun.rotation.z = Math.atan2(p.H, p.D) - Math.PI / 2; gun.position.set(0.5 * Math.cos(Math.atan2(p.H, p.D)), 0.5 * Math.sin(Math.atan2(p.H, p.D)), 0);
+      const o3 = { kind: 'v', r: 0.06, pad: 0.6 };
+      return { b: T.sphere(0.18, '--c1'), m: T.sphere(0.9, '--block2'), tr: T.trail('--c1', 3000), drop: T.line('--c4', { max: 2, dash: 0.2 }), vb: T.vec('--c1', 'v กระสุน', o3), vm: T.vec('--c5', 'v ลิง', o3), lab: T.label('', '--c4') };
+    },
+    update(ob, st, p, o) {
+      ob.b.position.set(st.bx, st.by, 0); ob.m.position.set(p.D, st.my, 0); if (st.t === 0) ob.tr.clear(); ob.tr.push([st.bx, st.by, 0]);
+      ob.drop.set([[p.D, p.H, 0], [p.D, st.my, 0]]); const d = p.H - st.my; ob.lab.set(d > 0.1 ? 'ตก ' + fmt(d) + ' m' : '', [p.D - 2.2, (p.H + st.my) / 2, 0]);
+      const th = o._th, t = st.t, k = Math.min(p.D, p.H) * 0.2 / Math.max(p.u, 1), vy = p.u * Math.sin(th) - p.g * t;
+      ob.vb.set([st.bx, st.by, 0.3], [p.u * Math.cos(th) * k, vy * k, 0], 'v ' + fmt(Math.hypot(p.u * Math.cos(th), vy)) + ' m/s');
+      st.my > 0 && t > 0 ? ob.vm.set([p.D, st.my, 1], [0, -p.g * t * k, 0], 'v ลิง ' + fmt(p.g * t) + ' m/s') : ob.vm.hide();
     }
   },
   notes: ['ไม่ว่าความเร็วกระสุนเท่าใด ถ้าเล็งตรงที่ลิง กระสุนจะตกจากแนวเล็งเท่ากับที่ลิงตกเสมอ', 'กระสุนช้าเกินไป ลิงจะถึงพื้นก่อน (ผลแสดงว่าไม่ถูก)', 'หลักนี้แสดงว่าการเคลื่อนที่แนวดิ่งกับแนวระดับเป็นอิสระต่อกัน']

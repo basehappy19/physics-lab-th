@@ -152,6 +152,25 @@ CASES.push({
       g.textPx(12, 40, 'ภาพแสดงช้ากว่าจริงมาก (เวลาจริง ' + fmt(o.t) + ' s)', { a: 'left', fs: 11, c: '--muted' });
     }
   },
+  three: {
+    cam(p) { const s = Math.max(p.L, p.d * 2); return { pos: [p.L * 0.3, s * 0.45, s * 1.1], target: [p.L * 0.6, 0, 0] }; },
+    build(T, p, o) {
+      const d = p.d, L = p.L, D = Math.max(2, d * 1.2), th = d * 0.08 + 0.1;
+      const top = T.box(L, th, D, p.V >= 0 ? '--pos' : '--neg'); top.position.set(L / 2, d / 2 + th / 2, 0);
+      const bot = T.box(L, th, D, p.V >= 0 ? '--neg' : '--pos'); bot.position.set(L / 2, -d / 2 - th / 2, 0);
+      T.label('แผ่น ' + (p.V >= 0 ? '+' : '−'), '--ink', { pos: [L / 2, d / 2 + th + 0.3, 0] });
+      const dir = p.V >= 0 ? -1 : 1; for (let x = L * 0.1; x < L; x += L / 5) for (let z = -D * 0.35; z <= D * 0.36; z += D * 0.35) T.vec('--muted', null, { kind: 'v', r: 0.02 * Math.max(1, d / 4), top: false, opacity: 0.45 }).set([x, -dir * d * 0.42, z], [0, dir * d * 0.84, 0]);
+      const o3 = { r: 0.03 * Math.max(1, d / 4), pad: 0.2 };
+      return { pt: T.sphere(0.08 * Math.max(1, d / 4), PT[p.pt].q < 0 ? '--neg' : '--pos'), tr: T.trail('--c1', 3000), aF: T.vec('--c4', 'F = qE', o3), aV: T.vec('--c1', 'v', Object.assign({ kind: 'v' }, o3)) };
+    },
+    update(ob, st, p, o) {
+      ob.pt.position.set(st.x, st.y, 0); if (st.t === 0) ob.tr.clear(); ob.tr.push([st.x, st.y, 0]);
+      const inside = st.x > 0 && st.x <= p.L, s = Math.sign(o._a) || 1, F = Math.min(p.d * 0.35, 1.2);
+      inside ? ob.aF.set([st.x, st.y, 0.15], [0, s * F, 0], 'F = qE') : ob.aF.hide();
+      const vy = inside ? Math.tan(Math.atan2(2 * st.y, Math.max(st.x, 1e-6))) : (st.x > p.L ? Math.tan(o.ang * RAD) : 0), n = Math.hypot(1, vy), Lv = Math.min(p.L * 0.2, 1.5);
+      ob.aV.set([st.x, st.y, -0.15], [Lv / n, vy * Lv / n, 0], 'v');
+    }
+  },
   notes: ['อิเล็กตรอนเบนเข้าหาแผ่นบวก โปรตอนเบนเข้าหาแผ่นลบ', 'โปรตอนมวลมากกว่าอิเล็กตรอนเกือบ 2000 เท่า ที่ความเร็วเท่ากันจึงเบนน้อยกว่ามาก', 'ระยะเบนแปรผกผันกับ v₀² ยิงเร็วขึ้น 2 เท่า เบนลดลง 4 เท่า', 'หลังออกจากแผ่นไม่มีแรง อนุภาคเคลื่อนที่เป็นเส้นตรง']
 });
 
@@ -309,6 +328,29 @@ CASES.push({
     }
   },
   plot: { series: [{ label: 'v', unit: 'm/s', c: '--c2', f: s => s.v }, { label: 'ε', unit: 'V', c: '--c4', f: s => s.e }, { label: 'I', unit: 'A', c: '--c1', f: s => s.I }] },
+  three: {
+    cam(p) { return { pos: [2.6, Math.max(2.6, p.L * 1.6), p.L + 3.2], target: [2.8, 0, -p.L / 2] }; },
+    build(T, p, o) {
+      const L = p.L; T.floor(10, { step: 0.5, y: -0.05 }).position.set(2.8, -0.05, -L / 2);
+      const rail = z => { const r = T.cyl(0.03, 0.03, 6, '--ink'); r.rotation.z = Math.PI / 2; r.position.set(3, 0.03, z); }; rail(0); rail(-L);
+      const end = T.cyl(0.03, 0.03, L, '--ink'); end.rotation.x = Math.PI / 2; end.position.set(0, 0.03, -L / 2);
+      const res = T.box(0.25, 0.12, L * 0.4, '--block2'); res.position.set(0, 0.06, -L / 2); T.label('R', '--ink', { pos: [-0.3, 0.1, -L / 2] });
+      for (let x = 0.3; x < 6; x += 0.8) for (let z = -L * 0.15; z > -L; z -= Math.max(0.35, L / 3)) T.vec('--muted', null, { kind: 'v', r: 0.012, top: false, opacity: 0.4 }).set([x, 0.9, z], [0, -0.7, 0]);
+      T.label('B ชี้ลง', '--muted', { pos: [5.7, 1.05, -L / 2] });
+      const flux = T.box(1, 0.004, L, '--c4', { opacity: 0.18, cast: false });
+      const o3 = { r: 0.02, pad: 0.12 };
+      return { rod: T.cyl(0.05, 0.05, L + 0.2, '--c2'), flux, aI: T.vec('--c1', 'I', Object.assign({ kind: 'v' }, o3)), aB: T.vec('--c3', 'F_B', o3), aF: T.vec('--c4', 'F ดึง', o3), aV: T.vec('--c6', 'v', Object.assign({ kind: 'v' }, o3)) };
+    },
+    update(ob, st, p, o) {
+      const L = p.L, xs = 0.6 + ((st.x - 0.6) % 5 + 5) % 5; ob.rod.rotation.x = Math.PI / 2; ob.rod.position.set(xs, 0.06, -L / 2);
+      ob.flux.scale.set(xs, 1, 1); ob.flux.position.set(xs / 2, 0.01, -L / 2);
+      const Fb = p.B * st.I * p.L, k = 1.2 / Math.max(p.F, Fb, 1e-9);
+      Math.abs(st.I) > 1e-6 ? ob.aI.set([xs, 0.15, -L * 0.2], [0, 0, -Math.min(L * 0.5, 0.25 + 0.4 * st.I / Math.max(1e-9, o.It))], 'I ' + fmt(st.I) + ' A') : ob.aI.hide();
+      Fb > 1e-6 ? ob.aB.set([xs, 0.15, -L * 0.5], [-Fb * k, 0, 0], 'F_B = BIL ' + fmt(Fb) + ' N') : ob.aB.hide();
+      p.F > 0 ? ob.aF.set([xs, 0.15, -L * 0.8], [p.F * k, 0, 0], 'F ดึง ' + fmt(p.F) + ' N') : ob.aF.hide();
+      Math.abs(st.v) > 1e-3 ? ob.aV.set([xs, 0.5, -L / 2], [st.v * 0.3 / Math.max(o.vt, st.v, 1e-6) * 2, 0, 0], 'v ' + fmt(st.v) + ' m/s') : ob.aV.hide();
+    }
+  },
   notes: ['ทิศกระแสเหนี่ยวนำทำให้เกิดแรงต้านการเคลื่อนที่เสมอ (กฎของเลนซ์)', 'เมื่อแรงต้าน B²L²v/R เท่ากับแรงดึง แท่งเคลื่อนที่ด้วยความเร็วคงที่ (ความเร็วปลาย)', 'ลองตั้งแรงดึงเป็นศูนย์และให้ความเร็วต้น แท่งจะช้าลงจนหยุด พลังงานจลน์กลายเป็นความร้อนในตัวต้านทาน']
 });
 

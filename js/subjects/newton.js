@@ -196,6 +196,62 @@ CASES.push({
   },
   plot: { series: [{ label: 'ระยะที่เชือกเลื่อน', unit: 'm', c: '--c2', f: s => s.s }, { label: 'v', unit: 'm/s', c: '--c1', f: s => s.v }] },
   live: [{ name: 'v', unit: 'm/s', f: s => s.v }],
+  three: {
+    cam(p) { return p.cfg === 'atwood' ? { pos: [2.4, 2.8, 5.4], target: [0, 2, 0] } : p.cfg === 'double' ? { pos: [1.2, 3.2, 7.2], target: [0, 1.3, 0] } : { pos: [-0.4, 1.4, 6.6], target: [-1, -0.2, 0] }; },
+    build(T, p, o) {
+      const sz = m => 0.32 + 0.18 * Math.cbrt(m / 4), b1 = sz(p.m1), b2 = sz(p.m2), D = 1;
+      const ob = { b1, b2, m1: T.box(b1 * 1.25, b1, b1, '--c2'), m2: T.box(b2, b2, b2, '--block2'), rope: T.line('--rope', { max: 8 }) };
+      if (p.cfg === 'atwood') { T.floor(8, { step: 0.5 }); K.ceil3d(T, -1.4, 1.4, 3.85); T.line('--ink', { pts: [[0, 3.85, 0], [0, 3.4, 0]] }); ob.R = 0.35; ob.pc = [0, 3.4]; }
+      else if (p.cfg === 'double') {
+        const t1 = p.t1 * RAD, t2 = p.t2 * RAD, Hh = 2.6, X1 = -Math.min(3.4, Hh / Math.tan(Math.max(0.2, t1))), X2 = Math.min(3.4, Hh / Math.tan(Math.max(0.2, t2)));
+        T.floor(10, { step: 0.5 }); T.extrude([[X1, 0], [0, Hh], [X2, 0]], D, '--block2', { receive: true }); ob.R = 0.18; ob.pc = [0, Hh + 0.18];
+      } else {
+        const th = p.cfg === 'table' ? 0 : p.t1 * RAD, c = Math.cos(th), sn = Math.sin(th), Bt = [-3.6 * c, -3.6 * sn];
+        T.floor(10, { step: 0.5, y: -2.5 }); T.extrude([[0, 0], Bt, [Bt[0], -2.5], [0.25, -2.5], [0.25, 0]], D, '--block2', { receive: true }); ob.R = 0.22; ob.pc = [0.15, 0.22];
+      }
+      ob.wheel = K.pulley3d(T, ob.R, ob.pc[0], ob.pc[1], 0, 0.14);
+      const o3 = { r: 0.022, pad: 0.12 }, v3 = Object.assign({ kind: 'v' }, o3);
+      ob.W1 = T.vec('--c1', 'm₁g', o3); ob.W2 = T.vec('--c1', 'm₂g', o3); ob.T1 = T.vec('--c4', 'T', o3); ob.T2 = T.vec('--c4', 'T', o3);
+      ob.N1 = T.vec('--c2', 'N₁', o3); ob.N2 = T.vec('--c2', 'N₂', o3); ob.f1 = T.vec('--c3', 'f₁', o3); ob.f2 = T.vec('--c3', 'f₂', o3);
+      ob.v1 = T.vec('--c6', 'v', v3); ob.v2 = T.vec('--c6', 'v', v3);
+      return ob;
+    },
+    update(ob, st, p, o) {
+      const s = st.s, r = o._r, R = ob.R, b1 = ob.b1, b2 = ob.b2, k = 1.25 / Math.max(p.m1 * G, p.m2 * G), zf = 0.62, Tn = isFinite(r.T) ? r.T : NaN;
+      const F = (a, P, d, mag, t) => (mag > 1e-6 && isFinite(mag)) ? a.set([P[0], P[1], zf], [d[0] * mag * k, d[1] * mag * k, 0], t + ' ' + fmt(mag) + ' N') : a.hide();
+      const V = (a, P, d) => Math.abs(st.v) > 1e-3 ? a.set([P[0], P[1] + 0.05, -zf], [d[0] * st.v * 0.6, d[1] * st.v * 0.6, 0], 'v ' + fmt(Math.abs(st.v)) + ' m/s') : a.hide();
+      ob.wheel.spin(-s / R); ob.N2.hide(); ob.f2.hide(); ob.N1.hide(); ob.f1.hide();
+      if (p.cfg === 'atwood') {
+        const y1 = 1.6 + s, y2 = 1.6 - s, P1 = [-R, y1], P2 = [R, y2];
+        ob.m1.position.set(-R, y1, 0); ob.m1.rotation.set(0, 0, 0); ob.m2.position.set(R, y2, 0);
+        ob.rope.set([[-R, y1 + b1 / 2, 0], [-R, 3.4, 0], [-R * 0.7, 3.4 + R * 0.7, 0], [0, 3.4 + R, 0], [R * 0.7, 3.4 + R * 0.7, 0], [R, 3.4, 0], [R, y2 + b2 / 2, 0]]);
+        F(ob.W1, P1, [0, -1], p.m1 * G, 'm₁g'); F(ob.T1, P1, [0, 1], Tn, 'T'); F(ob.W2, P2, [0, -1], p.m2 * G, 'm₂g'); F(ob.T2, P2, [0, 1], Tn, 'T');
+        V(ob.v1, P1, [0, 1]); V(ob.v2, P2, [0, -1]);
+      } else if (p.cfg === 'double') {
+        const t1 = p.t1 * RAD, t2 = p.t2 * RAD, Hh = 2.6;
+        const d1 = 1.3 - s, u1 = [-Math.cos(t1), -Math.sin(t1)], c1 = [d1 * u1[0] - Math.sin(t1) * b1 / 2, Hh + d1 * u1[1] + Math.cos(t1) * b1 / 2];
+        const d2 = 1.3 + s, u2 = [Math.cos(t2), -Math.sin(t2)], c2 = [d2 * u2[0] + Math.sin(t2) * b2 / 2, Hh + d2 * u2[1] + Math.cos(t2) * b2 / 2];
+        K.place3d(ob.m1, c1[0], c1[1], t1); K.place3d(ob.m2, c2[0], c2[1], -t2); ob.m2.scale.set(1.2, 1, 1);
+        ob.rope.set([[c1[0] - u1[0] * b1 * 0.6, c1[1] - u1[1] * b1 * 0.6, 0], [-R * 0.7, Hh + R * 1.5, 0], [R * 0.7, Hh + R * 1.5, 0], [c2[0] - u2[0] * b2 * 0.6, c2[1] - u2[1] * b2 * 0.6, 0]]);
+        const N1 = p.m1 * G * Math.cos(t1), N2 = p.m2 * G * Math.cos(t2), up1 = [-u1[0], -u1[1]], up2 = [-u2[0], -u2[1]], sg = Math.sign(r.D);
+        F(ob.W1, c1, [0, -1], p.m1 * G, 'm₁g'); F(ob.W2, c2, [0, -1], p.m2 * G, 'm₂g');
+        F(ob.N1, c1, [-Math.sin(t1), Math.cos(t1)], N1, 'N₁'); F(ob.N2, c2, [Math.sin(t2), Math.cos(t2)], N2, 'N₂');
+        F(ob.T1, c1, up1, Tn, 'T'); F(ob.T2, c2, up2, Tn, 'T');
+        if (r.a !== 0) { F(ob.f1, c1, up1.map(x => -sg * x), p.muk * N1, 'f₁'); F(ob.f2, c2, up2.map(x => sg * x), p.muk * N2, 'f₂'); }
+        V(ob.v1, c1, up1); V(ob.v2, c2, u2);
+      } else {
+        const th = p.cfg === 'table' ? 0 : p.t1 * RAD, c = Math.cos(th), sn = Math.sin(th), pc = ob.pc;
+        const d = 1.9 - s, cx = -d * c - sn * b1 / 2, cy = -d * sn + c * b1 / 2, y2 = -0.9 - s, x2 = pc[0] + R;
+        K.place3d(ob.m1, cx, cy, th); ob.m2.position.set(x2, y2, 0);
+        ob.rope.set([[cx + c * b1 * 0.65, cy + sn * b1 * 0.65, 0], [pc[0] - 0.02, pc[1] + R, 0], [pc[0] + R * 0.7, pc[1] + R * 0.7, 0], [x2, pc[1], 0], [x2, y2 + b2 / 2, 0]]);
+        const P1 = [cx, cy], P2 = [x2, y2], N1 = p.m1 * G * c;
+        F(ob.W1, P1, [0, -1], p.m1 * G, 'm₁g'); F(ob.N1, P1, [-sn, c], N1, 'N'); F(ob.T1, P1, [c, sn], Tn, 'T');
+        if (Math.abs(r.fric) > 1e-6) F(ob.f1, P1, [c * Math.sign(r.fric), sn * Math.sign(r.fric)], Math.abs(r.fric), 'f');
+        F(ob.W2, P2, [0, -1], p.m2 * G, 'm₂g'); F(ob.T2, P2, [0, 1], Tn, 'T');
+        V(ob.v1, P1, [c, sn]); V(ob.v2, P2, [0, -1]);
+      }
+    }
+  },
   notes: ['ระบบแอตวูด a = (m₂ − m₁)g/(m₁ + m₂) ถ้ามวลเท่ากันจะไม่เคลื่อนที่', 'แรงตึงเชือกน้อยกว่าน้ำหนักของมวลที่เคลื่อนลงเสมอ เพราะมวลนั้นมีความเร่งลง', 'แรงเสียดทานสถิตอาจทำให้ระบบนิ่งได้แม้แรงขับไม่เป็นศูนย์ ดูที่ "ติดอยู่นิ่ง"', 'ภาพแสดงการเคลื่อนที่ช่วงสั้นๆ เพื่อให้เห็นทิศ ค่าในตารางคือค่าที่คำนวณได้']
 });
 
@@ -243,6 +299,37 @@ CASES.push({
   },
   plot: { series: [{ label: 'ตาชั่ง N', unit: 'N', c: '--c2', f: (s, p) => Math.max(0, p.m * (G + s.a)) }, { label: 'v ลิฟต์', unit: 'm/s', c: '--c1', f: s => s.v }, { label: 'y ลิฟต์', unit: 'm', c: '--c4', f: s => s.y, on: false }] },
   live: [{ name: 'ตาชั่ง', unit: 'N', f: (s, p) => Math.max(0, p.m * (G + s.a)) }, { name: 'a', unit: 'm/s²', f: s => s.a }, { name: 'v', unit: 'm/s', f: s => s.v }],
+  three: {
+    cam() { return { pos: [4.2, 3.2, 6.4], target: [0.4, 1.4, 0] }; },
+    build(T, p, o) {
+      const W = 2.2, H = 2.8, i = o._i, world = T.group();
+      // ปล่องลิฟต์ (เลื่อนทั้งโลกแทนการเลื่อนกล้อง ลิฟต์จึงอยู่กลางจอเสมอ)
+      const fls = [], y0 = Math.floor((i.ymin - 4) / 3) * 3, y1 = Math.ceil((i.ymax + 8) / 3) * 3;
+      [-1, 1].forEach(sd => { const w = T.box(0.08, y1 - y0, W + 0.8, '--ground', { parent: world, opacity: 0.35, cast: false }); w.position.set(sd * (W / 2 + 0.35), (y0 + y1) / 2, 0); });
+      const back = T.box(W + 0.8, y1 - y0, 0.08, '--ground', { parent: world, opacity: 0.25, cast: false }); back.position.set(0, (y0 + y1) / 2, -(W / 2 + 0.4));
+      for (let f = y0; f <= y1; f += 3) { const sl = T.box(W + 0.8, 0.05, 0.25, '--muted', { parent: world, cast: false }); sl.position.set(0, f, -(W / 2 + 0.3)); fls.push([f, T.label('ชั้น ' + (f / 3 + 1), '--muted', { pos: [-(W / 2 + 0.6), f, 0] })]); }
+      const cab = T.group(); const fl = T.box(W, 0.1, W, '--panel', { parent: cab }); fl.position.y = 0.05;
+      const glass = T.box(W, H, W, '--water', { parent: cab, opacity: 0.1, cast: false }); glass.position.y = H / 2;
+      const eg = new T.THREE.LineSegments(new T.THREE.EdgesGeometry(new T.THREE.BoxGeometry(W, H, W)), new T.THREE.LineBasicMaterial({ color: T.color('--ink') })); eg.position.y = H / 2; cab.add(eg);
+      const sc = T.box(0.9, 0.12, 0.7, '--c4', { parent: cab }); sc.position.y = 0.16;
+      const body = T.cyl(0.2, 0.17, 0.95, '--c2', { parent: cab }); body.position.y = 0.22 + 0.6 + 0.475;
+      const legs = T.cyl(0.16, 0.13, 0.6, '--ink', { parent: cab }); legs.position.y = 0.22 + 0.3;
+      const head = T.sphere(0.17, '--block2', { parent: cab }); head.position.y = 0.22 + 1.55 + 0.17;
+      const cable = T.line('--rope', { max: 2 });
+      const o3 = { r: 0.03, pad: 0.15 };
+      return { world, cab, cable, H, fls, W, aW: T.vec('--c1', 'mg', o3), aN: T.vec('--c2', 'N', o3), aA: T.vec('--c3', 'a', Object.assign({ kind: 'v' }, o3)), aV: T.vec('--c6', 'v', Object.assign({ kind: 'v' }, o3)), read: T.label('', '--c2') };
+    },
+    update(ob, st, p, o) {
+      ob.world.position.y = -st.y; ob.cable.set([[0, ob.H, 0], [0, ob.H + 30, 0]]);
+      ob.fls.forEach(([f, l]) => l.set(null, [-(ob.W / 2 + 0.6), f - st.y, 0]));   // ป้ายชั้นเลื่อนตามโลก
+      const N = Math.max(0, p.m * (G + st.a)), k = 1.6 / (p.m * G * 1.6), zf = 0.45;
+      ob.aW.set([0.35, 1.3, zf], [0, -p.m * G * k, 0], 'mg ' + fmt(p.m * G) + ' N');
+      N > 1e-6 ? ob.aN.set([-0.35, 0.22, zf], [0, N * k, 0], 'N ' + fmt(N) + ' N') : ob.aN.hide();
+      Math.abs(st.a) > 0.01 ? ob.aA.set([-0.85, 1.4, 0], [0, st.a * 0.15, 0], 'a ' + fmt(st.a) + ' m/s²') : ob.aA.hide();
+      Math.abs(st.v) > 0.01 ? ob.aV.set([0.85, 1.4, 0], [0, st.v * 0.15, 0], 'v ' + fmt(st.v) + ' m/s') : ob.aV.hide();
+      ob.read.set('ตาชั่ง ' + fmt(N / G) + ' kg', [0, 3.2, 0]);
+    }
+  },
   notes: ['ตาชั่งขึ้นกับความเร่ง ไม่ใช่ความเร็ว ลิฟต์ขึ้นด้วยความเร็วคงที่ตาชั่งอ่านเท่ากับ mg', 'ลิฟต์เร่งขึ้นหรือชะลอขณะลง (a ชี้ขึ้น) ตาชั่งอ่านมากกว่า mg', 'ตกอิสระ a = −g ตาชั่งอ่านศูนย์ คือสภาพไร้น้ำหนัก']
 });
 
@@ -307,6 +394,27 @@ CASES.push({
     }
   },
   plot: { overlay: true, yLabel: 'v (m/s)', series: [{ label: 'v ก้อนล่าง', unit: 'm/s', c: '--c2', f: s => s.v1 }, { label: 'v ก้อนบน', unit: 'm/s', c: '--c1', f: s => s.v2 }] },
+  three: {
+    cam() { return { pos: [3.6, 2.8, 7.6], target: [3.4, 0.5, 0] }; },
+    build(T, p) {
+      const fl = T.floor(40, { step: 1 }); const b1 = T.box(2.4, 0.55, 1.2, '--c2'), b2 = T.box(0.9, 0.5, 0.9, '--block2');
+      const o3 = { r: 0.025, pad: 0.15 }, v3 = Object.assign({ kind: 'v' }, o3);
+      return { fl, grid: T.scene.children.find(c => c.isGridHelper), b1, b2, aF: T.vec('--c4', 'F', o3), f2: T.vec('--c3', 'f บน', o3), f1: T.vec('--c3', 'f ล่าง', o3), fg: T.vec('--c5', 'f พื้น', o3), v1: T.vec('--c2', 'v₁', v3), v2: T.vec('--c1', 'v₂', v3) };
+    },
+    update(ob, st, p, o) {
+      const L1 = 2.4, h1 = 0.55, L2 = 0.9, h2 = 0.5, r = o._r, cam = Math.max(0, st.x1 - 3), X1 = st.x1 - cam, X2 = X1 + 0.2 + (st.x2 - st.x1);
+      if (ob.grid) ob.grid.position.x = -(cam % 1);   // พื้นเลื่อนตามรถ
+      ob.b1.position.set(X1 + L1 / 2, h1 / 2, 0); ob.b2.position.set(X2 + L2 / 2, st.y2 + h2 / 2, 0);
+      const k = 1.6 / Math.max(p.F, r.f12, 1e-9), z = 0.62;
+      const F = (a, P, x, t) => Math.abs(x) > 1e-6 ? a.set([P[0], P[1], z], [x * k, 0, 0], t + ' ' + fmt(Math.abs(x)) + ' N') : a.hide();
+      if (p.on === 'bottom') F(ob.aF, [X1 + L1, h1 / 2], p.F, 'F'); else if (!st.off) F(ob.aF, [X2 + L2, h1 + h2 / 2], p.F, 'F'); else ob.aF.hide();
+      const sg = p.on === 'bottom' ? 1 : -1;
+      if (!st.off && r.f12 > 0) { F(ob.f2, [X2 + L2 / 2, h1 + 0.05], sg * r.f12, 'f บน'); F(ob.f1, [X2 + L2 / 2, h1 - 0.05], -sg * r.f12, 'f ล่าง'); } else { ob.f2.hide(); ob.f1.hide(); }
+      (r.a1 > 0 || st.v1 > 1e-3) ? F(ob.fg, [X1 + L1 / 2, 0.02], -r.fg, 'f พื้น') : ob.fg.hide();
+      st.v1 > 1e-3 ? ob.v1.set([X1 + L1 / 2, h1 + 0.9, -0.3], [st.v1 * 0.25, 0, 0], 'v₁ ' + fmt(st.v1) + ' m/s') : ob.v1.hide();
+      st.v2 > 1e-3 ? ob.v2.set([X2 + L2 / 2, st.y2 + h2 + 0.4, -0.3], [st.v2 * 0.25, 0, 0], 'v₂ ' + fmt(st.v2) + ' m/s') : ob.v2.hide();
+    }
+  },
   notes: ['ดึงก้อนล่างแรงเกินไป ก้อนบนจะไถลไปข้างหลังเมื่อเทียบกับก้อนล่าง (แม้ยังเคลื่อนไปข้างหน้าเทียบพื้น)', 'แรงเสียดทานที่ก้อนล่างกระทำต่อก้อนบนเป็นแรงที่ทำให้ก้อนบนมีความเร่ง', 'ค่า "F มากสุดที่ยังไปด้วยกัน" คือเงื่อนไขที่พบบ่อยในข้อสอบ']
 });
 
