@@ -1,7 +1,7 @@
 {
-  "name": "ห้องทดลองฟิสิกส์ TPAT3",
-  "short_name": "ฟิสิกส์ TPAT3",
-  "description": "แบบจำลองฟิสิกส์โต้ตอบครบ 15 บทตามเนื้อหา TPAT3 ทั้ง 2D และ 3D",
+  "name": "ห้องทดลองฟิสิกส์",
+  "short_name": "ห้องทดลองฟิสิกส์",
+  "description": "แบบจำลองฟิสิกส์โต้ตอบ 15 บท ทั้ง 2D และ 3D",
   "lang": "th",
   "start_url": "./index.html#start",
   "scope": "./",

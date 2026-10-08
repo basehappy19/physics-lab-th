@@ -1,4 +1,4 @@
-/* ห้องทดลองฟิสิกส์ TPAT3 — สไตล์กระจกแบบ macOS
+/* ห้องทดลองฟิสิกส์ — สไตล์กระจกแบบ macOS
  * Layout: หน้าแรก / สารบัญ / ห้องทดลอง (ภาพ+กราฟ | แผงปรับค่า → ผลลัพธ์ ตารางทิศทาง ข้อสังเกต)
  * สีทั้งหมดเป็น token; โหมดมืดกำหนดซ้ำใน 2 บล็อกด้านล่าง
  * --panel และ --bg ต้องเป็นสีทึบ (hex) เพราะ canvas/3D อ่านค่านี้ไปใช้ — ความโปร่งแบบกระจกใช้ --glass* แยก */
@@ -64,10 +64,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 
 /* พื้นผิวกระจก: การ์ดวางบนวอลเปเปอร์ที่ไล่สีนุ่มอยู่แล้ว ใช้สีโปร่งแสงก็ได้ผลเหมือนเบลอ
  * จึงเบลอจริง (backdrop-filter ซึ่งกิน GPU) เฉพาะแถบเมนูที่ลอยทับเนื้อหาขณะเลื่อนหน้า */
-.card,.viewer,.chap,.subjects,.cbtn,.fcard,.tips>div,.creator,.hero{
+.card,.viewer,.chap,.navwrap,.cbtn,.fcard,.tips>div,.creator,.hero{
   background:var(--glass);border:1px solid var(--glass-edge);box-shadow:var(--shadow)}
-.subjects{background:var(--glass-bar);-webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%)}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.subjects{background:var(--panel)}}
+.navwrap{background:var(--glass-bar);-webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.navwrap{background:var(--panel)}}
 /* ส่วนที่อยู่นอกจอยังไม่ต้องจัดหน้า/วาด */
 .chap,#landing>section:not(.hero){content-visibility:auto;contain-intrinsic-size:auto 320px}
 
@@ -77,8 +77,19 @@ header p{margin:6px 0 0;color:var(--muted);max-width:75ch}
 .site-title{font-size:.8rem;font-weight:600;letter-spacing:.04em;color:var(--muted);margin:0 0 2px}
 
 /* แถบเมนูบท (ลอยแบบ toolbar) */
-.subjects{position:sticky;top:10px;z-index:20;display:flex;gap:2px;overflow-x:auto;padding:5px;border-radius:16px;scrollbar-width:none}
-.subjects::-webkit-scrollbar{display:none}
+.navwrap{position:sticky;top:10px;z-index:20;border-radius:16px}
+.subjects{display:flex;gap:2px;overflow-x:auto;padding:5px;border-radius:16px;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+/* แถบเลื่อนแนวนอน: ขอบจางและปุ่มลูกศรขึ้นเมื่อยังมีส่วนที่ซ่อนอยู่ */
+.scrollwrap{position:relative}
+.scrollwrap>:not(.nsc){--fl:0px;--fr:0px;-webkit-mask-image:linear-gradient(to right,transparent,#000 var(--fl),#000 calc(100% - var(--fr)),transparent);mask-image:linear-gradient(to right,transparent,#000 var(--fl),#000 calc(100% - var(--fr)),transparent)}
+.scrollwrap.can-l>:not(.nsc){--fl:44px}.scrollwrap.can-r>:not(.nsc){--fr:44px}
+.nsc{position:absolute;top:50%;z-index:2;width:30px;height:30px;margin-top:-15px;display:grid;place-items:center;padding:0 0 2px;font:600 20px/1 var(--f-body);color:var(--ink);background:var(--panel);border:1px solid var(--hair);border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer;opacity:0;pointer-events:none;transition:opacity .15s}
+.nsc.l{left:4px}.nsc.r{right:4px}
+.scrollwrap.can-l .nsc.l,.scrollwrap.can-r .nsc.r{opacity:1;pointer-events:auto}
+.nsc:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.dragging{cursor:grabbing;user-select:none}.dragging button{pointer-events:none}
+@media (pointer:coarse){.nsc{display:none}}
+.subjects::-webkit-scrollbar,.tabs::-webkit-scrollbar{display:none}
 .subjects button{flex:none;font:inherit;font-weight:500;font-size:.9rem;padding:6px 12px;border:0;border-radius:11px;background:none;color:var(--ink);cursor:pointer;display:flex;gap:6px;align-items:center;transition:background .15s,color .15s}
 .subjects button .ic{opacity:.75}
 .subjects button .no{font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
@@ -88,7 +99,8 @@ header p{margin:6px 0 0;color:var(--muted);max-width:75ch}
 .subjects button.empty{opacity:.5}
 
 /* แท็บแบบจำลอง (segmented) */
-.tabs{display:flex;gap:4px;overflow-x:auto;padding:4px;align-items:center;background:var(--seg);border-radius:14px;scrollbar-width:thin;width:fit-content;max-width:100%}
+.tabswrap{width:fit-content;max-width:100%}
+.tabs{display:flex;gap:4px;overflow-x:auto;padding:4px;align-items:center;background:var(--seg);border-radius:14px;scrollbar-width:none;overscroll-behavior-x:contain}
 .tabs button{flex:none;font:inherit;font-size:.9rem;font-weight:500;padding:6px 14px;border:0;background:none;color:var(--ink);border-radius:10px;cursor:pointer;display:flex;gap:6px;align-items:center;transition:background .15s}
 .tabs button:hover{background:color-mix(in srgb,var(--seg-on) 50%,transparent)}
 .tabs button[aria-selected="true"]{background:var(--seg-on);box-shadow:0 1px 3px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04);font-weight:600}
@@ -271,10 +283,31 @@ footer:empty{display:none}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto;transition:none!important}}
 
 /* สีประจำบท — กลุ่มเดียวกันใช้โทนใกล้กัน: วัด(เทา) กลศาสตร์(ฟ้า-คราม-เขียวน้ำ) ไฟฟ้า(เหลือง) ความร้อน(แดง) ของแข็ง(น้ำตาล) ของไหล(ฟ้าน้ำ) ทั่วไป(ม่วง) สิ่งแวดล้อม(เขียว) */
-[href^="#sci."]{--ic:#8e8e93}
-[href^="#kin."]{--ic:#007aff} [href^="#newton."]{--ic:#5856d6} [href^="#equil."]{--ic:#0f9d8f}
-[href^="#energy."]{--ic:#ff9500} [href^="#momentum."]{--ic:#af52de} [href^="#proj."]{--ic:#00b4d8}
-[href^="#circ."]{--ic:#4cb4ff} [href^="#shm."]{--ic:#ff6482}
-[href^="#elec."]{--ic:#e6a700} [href^="#thermo."]{--ic:#ff3b30} [href^="#solid."]{--ic:#a2845e}
-[href^="#fluid."]{--ic:#1e88e5} [href^="#general."]{--ic:#8e44ef} [href^="#env."]{--ic:#34c759}
+[href^="#sci."],[data-c="sci"]{--ic:#8e8e93}
+[href^="#kin."],[data-c="kin"]{--ic:#007aff} [href^="#newton."],[data-c="newton"]{--ic:#5856d6} [href^="#equil."],[data-c="equil"]{--ic:#0f9d8f}
+[href^="#energy."],[data-c="energy"]{--ic:#ff9500} [href^="#momentum."],[data-c="momentum"]{--ic:#af52de} [href^="#proj."],[data-c="proj"]{--ic:#00b4d8}
+[href^="#circ."],[data-c="circ"]{--ic:#4cb4ff} [href^="#shm."],[data-c="shm"]{--ic:#ff6482}
+[href^="#elec."],[data-c="elec"]{--ic:#e6a700} [href^="#thermo."],[data-c="thermo"]{--ic:#ff3b30} [href^="#solid."],[data-c="solid"]{--ic:#a2845e}
+[href^="#fluid."],[data-c="fluid"]{--ic:#1e88e5} [href^="#general."],[data-c="general"]{--ic:#8e44ef} [href^="#env."],[data-c="env"]{--ic:#34c759}
 [href] .icbox{background:linear-gradient(160deg,color-mix(in srgb,var(--ic,var(--accent)) 72%,#fff),var(--ic,var(--accent)));box-shadow:0 3px 10px color-mix(in srgb,var(--ic,var(--accent)) 32%,transparent),inset 0 1px 0 rgba(255,255,255,.35)}
+
+/* ---------- มือถือ: แถบบทย้ายไปด้านล่างเป็นไอคอน เมื่อเลื่อนพ้นตำแหน่งเดิม ---------- */
+#navtip{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));z-index:40;transform:translate(-50%,8px);max-width:calc(100vw - 32px);padding:7px 14px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:.88rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+#navtip.on{opacity:1;transform:translate(-50%,0)}
+@media (max-width:760px){
+  .navwrap{position:relative;top:auto}
+  body.docked{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  body.docked .navwrap{position:fixed;left:10px;right:10px;top:auto;bottom:calc(10px + env(safe-area-inset-bottom));z-index:30;border-radius:22px;box-shadow:var(--shadow-lg);animation:dockin .22s ease-out}
+  body.docked .subjects{padding:6px;gap:4px;border-radius:22px}
+  body.docked .subjects button{width:48px;height:48px;padding:0;justify-content:center;border-radius:15px;position:relative}
+  body.docked .subjects button .nm,body.docked .subjects button .no{display:none}
+  body.docked .subjects button .ic{width:24px;height:24px;opacity:.85}
+  body.docked .subjects button[aria-selected="true"] .ic{opacity:1}
+  body.docked .scrollwrap.can-l>:not(.nsc){--fl:28px}body.docked .scrollwrap.can-r>:not(.nsc){--fr:28px}
+}
+@keyframes dockin{from{transform:translateY(130%);opacity:0}}
+@media (min-width:761px){#navtip{display:none}}
+/* ไอคอนในแถบบทใช้สีประจำบท ช่วยจำได้แม้ไม่มีชื่อ */
+.subjects button[data-c] .ic{color:var(--ic);opacity:1}
+.subjects button[data-c][aria-selected="true"]{background:var(--ic);box-shadow:0 2px 8px color-mix(in srgb,var(--ic) 40%,transparent)}
+.subjects button[data-c][aria-selected="true"] .ic{color:#fff}

@@ -1,4 +1,4 @@
-/* ห้องทดลองฟิสิกส์ TPAT3 — แกนกลาง (v2)
+/* ห้องทดลองฟิสิกส์ — แกนกลาง (v2)
  * โครง: บท (chapter) → แบบจำลอง (case)
  * แบบจำลองมี 2 ชนิด
  *   1) ภาพนิ่ง SVG:  case.draw(P,o) คืนสตริง SVG 640×300
@@ -99,15 +99,15 @@ const Lab = (function () {
   // ไอคอนเส้นเรียบ (svg) ของแต่ละบท กำหนดใน chapters.js ผ่าน Lab.icons
   const icon = (id, sz = 22) => { const d = (Lab.icons || {})[id]; return d ? `<svg class="ic" width="${sz}" height="${sz}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>` : ''; };
   const showPage = which => { $('#landing').hidden = which !== 'landing'; $('#homeGrid').hidden = which !== 'toc'; $('#lab').hidden = which !== 'lab'; $('#hdr').hidden = which === 'landing'; };
-  const SITE = 'ห้องทดลองฟิสิกส์ TPAT3';
+  const SITE = 'ห้องทดลองฟิสิกส์';
   const FEATURED = [['equil', 'คานแก้ไขได้', 'วางน้ำหนัก จุดรองรับ เชือก สปริง แล้วดูแรงทุกตัว'], ['newton', 'พื้นเอียง', 'ลากมุมและกล่องได้ ดูแรงเสียดทานสถิตกับจลน์'], ['proj', 'ยิงโพรเจกไทล์', 'เล็ง ย้ายเป้า เก็บรอยทางเทียบหลายนัด'], ['energy', 'รางเลื่อนแก้ไขได้', 'ปั้นรางเอง ดูพลังงานเปลี่ยนรูป'], ['elec', 'สนามและศักย์ไฟฟ้า', 'ลากประจุ ดูเส้นสนามและพื้นผิวศักย์ 3D'], ['env', 'แผงโซลาร์เซลล์', 'ดวงอาทิตย์เคลื่อนที่ทั้งวัน 3D']];
   function goLanding() {
-    si = -2; ci = -1; cur = null; playing = false; showPage('landing'); document.title = SITE + ' — แบบจำลองฟิสิกส์โต้ตอบครบ 15 บท';
+    si = -2; ci = -1; cur = null; playing = false; showPage('landing'); document.title = SITE + ' — แบบจำลองฟิสิกส์โต้ตอบ 15 บท 2D และ 3D';
     $('#foot').textContent = '';
     const nCase = chapters.reduce((a, c) => a + c.cases.length, 0), n3 = chapters.reduce((a, c) => a + c.cases.filter(x => x.three).length, 0);
     const find = (cid, nm) => { const c = chap(cid); const k = c ? c.cases.findIndex(x => x.name === nm) : -1; return k >= 0 ? `#${cid}.${k}` : `#${cid}.0`; };
-    $('#landing').innerHTML = `<section class="hero"><p class="eyebrow">${icon('general', 18)} TPAT3 · ฟิสิกส์</p><h1>ห้องทดลองฟิสิกส์ TPAT3</h1>
-      <p class="lead">แบบจำลองโต้ตอบครบทุกบทของ TPAT3 ปรับค่าตามโจทย์ ลากย้ายวัตถุ เพิ่มหรือลบชิ้นส่วน แล้วดูผลทันทีผ่านแอนิเมชัน กราฟ และภาพ 3D</p>
+    $('#landing').innerHTML = `<section class="hero"><p class="eyebrow">${icon('general', 18)} แบบจำลองฟิสิกส์โต้ตอบ</p><h1>ห้องทดลองฟิสิกส์</h1>
+      <p class="lead">ตั้งแต่การวัด กลศาสตร์ ไฟฟ้า ความร้อน ของไหล คลื่น แสง จนถึงฟิสิกส์ยุคใหม่ ปรับค่าตามโจทย์ ลากย้ายวัตถุ เพิ่มหรือลบชิ้นส่วน แล้วดูผลทันทีผ่านแอนิเมชัน กราฟ และภาพ 3D</p>
       <div class="cta"><a class="b1" href="#home">${icon('toc', 18)}ดูสารบัญทั้งหมด</a><button class="b2" id="rand">${icon('dice', 18)}สุ่มแบบจำลอง</button></div>
       <p class="stats"><b>${chapters.length}</b> บท · <b>${nCase}</b> แบบจำลอง · <b>${n3}</b> แบบมีมุมมอง 3D</p></section>
       <section><h2 class="sec">เลือกบท</h2><div class="chapgrid">${chapters.map(c => `<a class="cbtn" href="#${c.id}.0"><span class="icbox">${icon(c.id, 26)}</span><span class="t"><span class="no">บทที่ ${c.no}</span><span class="nm">${c.short || c.name}</span></span><span class="ct">${c.cases.length}</span></a>`).join('')}</div></section>
@@ -124,15 +124,68 @@ const Lab = (function () {
 
   // ---------- เมนูบท ----------
   function buildNav() {
-    $('#subjects').innerHTML = `<button role="tab" aria-selected="${si === -2}" data-s="-2">${icon('start', 16)}หน้าแรก</button><button role="tab" aria-selected="${si === -1}" data-s="-1">${icon('toc', 16)}สารบัญ</button>` +
-      chapters.map((c, i) => `<button role="tab" aria-selected="${i === si}" data-s="${i}" ${c.cases.length ? '' : 'class="empty"'}>${icon(c.id, 16)}<span class="no">${c.no}</span>${c.short || c.name}</button>`).join('');
-    $('#subjects').onclick = e => { const b = e.target.closest('button'); if (b) { const k = +b.dataset.s; go(k, 0); } };
+    $('#subjects').innerHTML = `<button role="tab" aria-selected="${si === -2}" data-s="-2" data-tip="หน้าแรก" aria-label="หน้าแรก">${icon('start', 16)}<span class="nm">หน้าแรก</span></button><button role="tab" aria-selected="${si === -1}" data-s="-1" data-tip="สารบัญ" aria-label="สารบัญ">${icon('toc', 16)}<span class="nm">สารบัญ</span></button>` +
+      chapters.map((c, i) => `<button role="tab" aria-selected="${i === si}" data-s="${i}" data-c="${c.id}" data-tip="บทที่ ${c.no} · ${esc(c.name)}" aria-label="บทที่ ${c.no} ${esc(c.name)}" ${c.cases.length ? '' : 'class="empty"'}>${icon(c.id, 16)}<span class="no">${c.no}</span><span class="nm">${c.short || c.name}</span></button>`).join('');
     const on = $('#subjects [aria-selected="true"]'); if (on) hscroll($('#subjects'), on);
+    if (navUpd) navUpd();
+  }
+  // ---------- แถบเลื่อนแนวนอน: ล้อเมาส์ ลากด้วยเมาส์ ปุ่มลูกศร และขอบจาง ----------
+  let navUpd = null, tabsUpd = null;
+  function scroller(el) {
+    const wrap = el.parentElement, l = wrap.querySelector('.nsc.l'), r = wrap.querySelector('.nsc.r');
+    const upd = () => { const max = el.scrollWidth - el.clientWidth; wrap.classList.toggle('can-l', el.scrollLeft > 2); wrap.classList.toggle('can-r', el.scrollLeft < max - 2); };
+    el.addEventListener('scroll', upd, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(upd).observe(el);
+    const page = d => el.scrollBy({ left: d * Math.max(160, el.clientWidth * 0.7), behavior: 'smooth' });
+    if (l) l.onclick = () => page(-1); if (r) r.onclick = () => page(1);
+    // ล้อเมาส์แนวตั้งเลื่อนแถบแนวนอน (ถ้าเลื่อนสุดแล้ว ปล่อยให้หน้าเลื่อนตามปกติ)
+    el.addEventListener('wheel', e => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX) || el.scrollWidth <= el.clientWidth + 1) return;
+      const b = el.scrollLeft; el.scrollLeft += e.deltaY * (e.deltaMode === 1 ? 32 : 1); if (el.scrollLeft !== b) e.preventDefault();
+    }, { passive: false });
+    // ลากด้วยเมาส์ (บนจอสัมผัสใช้การปัดของเบราว์เซอร์อยู่แล้ว)
+    let d = null;
+    el.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && e.button === 0) d = { x: e.clientX, s: el.scrollLeft, moved: false }; });
+    window.addEventListener('pointermove', e => { if (!d) return; const dx = e.clientX - d.x; if (!d.moved && Math.abs(dx) > 6) { d.moved = true; el.classList.add('dragging'); } if (d.moved) el.scrollLeft = d.s - dx; });
+    window.addEventListener('pointerup', () => {
+      if (d && d.moved) { const stop = ev => { ev.stopPropagation(); ev.preventDefault(); }; el.addEventListener('click', stop, { capture: true, once: true }); setTimeout(() => el.removeEventListener('click', stop, { capture: true }), 0); }
+      d = null; el.classList.remove('dragging');
+    });
+    upd(); return upd;
+  }
+  // ---------- มือถือ: เลื่อนพ้นแถบบทแล้วย้ายแถบไปเป็นแถบไอคอนด้านล่าง ----------
+  const mqDock = matchMedia('(max-width: 760px)');
+  let docked = false, tipT = 0;
+  function setDock(on) {
+    if (on === docked) return; docked = on;
+    const slot = $('#navslot'), wrap = $('#navwrap');
+    if (on) slot.style.height = slot.offsetHeight + 'px'; else slot.style.height = '';
+    document.body.classList.toggle('docked', on);
+    const sel = $('#subjects [aria-selected="true"]'); if (sel) hscroll($('#subjects'), sel);
+    if (navUpd) requestAnimationFrame(navUpd);
+  }
+  function showTip(t) {
+    const el = $('#navtip'); el.textContent = t; el.classList.add('on');
+    clearTimeout(tipT); tipT = setTimeout(() => el.classList.remove('on'), 1600);
+  }
+  function setupNav() {
+    navUpd = scroller($('#subjects')); tabsUpd = scroller($('#tabs'));
+    let press = null, longPressed = false;
+    $('#subjects').addEventListener('pointerdown', e => { const b = e.target.closest('button'); longPressed = false; clearTimeout(press); if (b && e.pointerType !== 'mouse') press = setTimeout(() => { longPressed = true; showTip(b.dataset.tip); }, 450); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => $('#subjects').addEventListener(t, () => clearTimeout(press)));
+    $('#subjects').addEventListener('contextmenu', e => { if (docked) e.preventDefault(); });
+    $('#subjects').onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (longPressed) { longPressed = false; return; }   // กดค้าง = ดูชื่ออย่างเดียว
+      const wasDocked = docked; go(+b.dataset.s, 0); if (wasDocked) showTip(b.dataset.tip);
+    };
+    if (window.IntersectionObserver) new IntersectionObserver(es => { const e = es[0]; setDock(mqDock.matches && !e.isIntersecting && e.boundingClientRect.top < 0); }, { threshold: 0 }).observe($('#navslot'));
+    mqDock.addEventListener('change', () => { if (!mqDock.matches) setDock(false); });
   }
   function goHome() {
     si = -1; ci = -1; cur = null; playing = false; showPage('toc'); document.title = 'สารบัญแบบจำลอง · ' + SITE;
     $('#siteH1').textContent = 'สารบัญแบบจำลอง';
-    $('#subjDesc').textContent = 'แบบจำลองโต้ตอบครบ 15 บทตามเนื้อหา TPAT3 ปรับค่าได้ละเอียด ลากย้ายวัตถุ เพิ่มหรือลบชิ้นส่วน ดูแอนิเมชันและกราฟสด ทั้ง 2D และ 3D';
+    $('#subjDesc').textContent = 'แบบจำลองฟิสิกส์โต้ตอบ 15 บท ปรับค่าได้ละเอียด ลากย้ายวัตถุ เพิ่มหรือลบชิ้นส่วน ดูแอนิเมชันและกราฟสด ทั้ง 2D และ 3D';
     $('#foot').textContent = '';
     $('#homeGrid').innerHTML = chapters.map((c, i) => `<article class="chap"><a class="chap-h" href="#${c.id}.0" data-s="${i}"><span class="icbox">${icon(c.id, 24)}</span><span class="no">บทที่ ${c.no}</span><span class="nm">${c.name}</span><span class="ct">${c.cases.length} แบบจำลอง · ${c.blurb || ''}</span></a>` +
       `<div class="chips">${c.cases.map((cs, k) => `<a href="#${c.id}.${k}">${cs.name}${cs.three ? '<span class="d3">3D</span>' : ''}</a>`).join('')}</div></article>`).join('');
@@ -155,6 +208,7 @@ const Lab = (function () {
     }).join('');
     $('#tabs').onclick = e => { const b = e.target.closest('button'); if (b) selectCase(+b.dataset.i); };
     const on = $('#tabs [aria-selected="true"]'); if (on) hscroll($('#tabs'), on);
+    if (tabsUpd) tabsUpd();
   }
 
   // ---------- ตัวควบคุม ----------
@@ -432,6 +486,7 @@ const Lab = (function () {
     G = new Lab.G2($('#cv'));
     GR = Lab.Graph ? new Lab.Graph($('#gcv')) : null;
     HAS3 = !!(Lab.V3 && window.WebGLRenderingContext);
+    setupNav();
     if (window.IntersectionObserver) new IntersectionObserver(es => { onScreen = es[0].isIntersecting; if (onScreen) dirty = true; }).observe($('#viewer'));
     bindCanvas();
     $('#glegend').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; GR.toggle(+b.dataset.g); b.parentElement.querySelectorAll('button').forEach((x, k) => x.setAttribute('aria-pressed', String(GR.on[k]))); resizeView(); GR.draw(); });
