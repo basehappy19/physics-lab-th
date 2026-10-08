@@ -41,8 +41,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <!-- ฟอนต์อยู่ในโปรเจกต์ (ไม่ต้องต่อเน็ต) เมื่อเปิดผ่านเว็บเซิร์ฟเวอร์จะโหลดตัวไทยล่วงหน้าให้ข้อความขึ้นเร็ว -->
 <script>if (/^https?:/.test(location.protocol)) ['400', '700'].forEach(w => { const l = document.createElement('link'); l.rel = 'preload'; l.as = 'font'; l.type = 'font/woff2'; l.crossOrigin = ''; l.href = 'fonts/ibm-plex-sans-thai-thai-' + w + '-normal.woff2'; document.head.appendChild(l); });</script>
-<link rel="stylesheet" href="css/fonts.css">
-<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/fonts.css?v=9066a0d3">
+<link rel="stylesheet" href="css/style.css?v=3a15b75e">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"WebApplication","name":"ห้องทดลองฟิสิกส์","alternateName":"Physics Lab","description":"แบบจำลองฟิสิกส์โต้ตอบ 15 บท ปรับค่าได้ ลากวัตถุได้ มีแอนิเมชัน กราฟสด และมุมมอง 3D","applicationCategory":"EducationalApplication","operatingSystem":"Any (เว็บเบราว์เซอร์)","inLanguage":"th","isAccessibleForFree":true,"offers":{"@type":"Offer","price":"0","priceCurrency":"THB"},"educationalLevel":"มัธยมศึกษาตอนปลาย","learningResourceType":"Simulation","about":["ฟิสิกส์","กลศาสตร์","ไฟฟ้า","ของไหล","คลื่นและแสง","ฟิสิกส์ยุคใหม่"],"image":"assets/og-image.png","author":{"@type":"Person","name":"base_happy19","url":"https://www.instagram.com/base_happy19/"}}
 </script>
@@ -95,32 +95,32 @@
   <div class="credit-row"><div class="btns"><button class="btn" id="themebtn">สลับโหมดมืด/สว่าง</button></div><p class="credit">สร้างโดย <a href="https://www.instagram.com/base_happy19/" target="_blank" rel="noopener">IG: base_happy19</a></p></div>
 </div>
 <!-- three.js (vendor/three.min.js) โหลดเองเมื่อเปิดมุมมอง 3D ครั้งแรก -->
-<script src="js/engine.js"></script>
-<script src="js/draw2d.js"></script>
-<script src="js/graph.js"></script>
-<script src="js/view3d.js"></script>
-<script src="js/kit.js"></script>
-<script src="js/chapters.js"></script>
+<script src="js/engine.js?v=95efd211"></script>
+<script src="js/draw2d.js?v=89c6aa05"></script>
+<script src="js/graph.js?v=b09e262a"></script>
+<script src="js/view3d.js?v=a2749f28"></script>
+<script src="js/kit.js?v=4d1e98ce"></script>
+<script src="js/chapters.js?v=eba39675"></script>
 <!-- แบบจำลองแต่ละบท: เพิ่มไฟล์ใหม่ต่อท้ายตรงนี้ -->
-<script src="js/subjects/sci.js"></script>
-<script src="js/subjects/kin.js"></script>
-<script src="js/subjects/newton.js"></script>
-<script src="js/subjects/equil.js"></script>
-<script src="js/subjects/energy.js"></script>
-<script src="js/subjects/momentum.js"></script>
-<script src="js/subjects/proj.js"></script>
-<script src="js/subjects/circ.js"></script>
-<script src="js/subjects/shm.js"></script>
-<script src="js/subjects/elec.js"></script>
-<script src="js/subjects/thermo.js"></script>
-<script src="js/subjects/solid.js"></script>
-<script src="js/subjects/fluid2.js"></script>
-<script src="js/subjects/fluid.js"></script>
-<script src="js/subjects/waves.js"></script>
-<script src="js/subjects/optics.js"></script>
-<script src="js/subjects/modern.js"></script>
-<script src="js/subjects/relativity.js"></script>
-<script src="js/subjects/env.js"></script>
+<script src="js/subjects/sci.js?v=77362c7a"></script>
+<script src="js/subjects/kin.js?v=948ec4e7"></script>
+<script src="js/subjects/newton.js?v=01c9844d"></script>
+<script src="js/subjects/equil.js?v=3856c81d"></script>
+<script src="js/subjects/energy.js?v=2fcb0421"></script>
+<script src="js/subjects/momentum.js?v=4345fae4"></script>
+<script src="js/subjects/proj.js?v=aebb01d7"></script>
+<script src="js/subjects/circ.js?v=dd060647"></script>
+<script src="js/subjects/shm.js?v=30f53dc4"></script>
+<script src="js/subjects/elec.js?v=dd40063c"></script>
+<script src="js/subjects/thermo.js?v=b6454dc9"></script>
+<script src="js/subjects/solid.js?v=5479a231"></script>
+<script src="js/subjects/fluid2.js?v=ef8797ef"></script>
+<script src="js/subjects/fluid.js?v=35ea3dca"></script>
+<script src="js/subjects/waves.js?v=33d4fbb8"></script>
+<script src="js/subjects/optics.js?v=ac5c6646"></script>
+<script src="js/subjects/modern.js?v=63f823d1"></script>
+<script src="js/subjects/relativity.js?v=acbf741a"></script>
+<script src="js/subjects/env.js?v=4eb7baed"></script>
 <script>Lab.start();</script>
 </body>
 </html>

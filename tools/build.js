@@ -12,9 +12,10 @@ const b64 = p => fs.readFileSync(path.join(root, p)).toString('base64');
 const MIME = { '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
 const dataUri = p => `data:${MIME[path.extname(p)]};base64,${b64(p)}`;
 
+require('./stamp')();
 let html = read('index.html');
 // CSS (ฟอนต์ใน fonts.css แปลงเป็น data URI)
-html = html.replace(/<link rel="stylesheet" href="(css\/[^"]+)">/g, (_, p) => {
+html = html.replace(/<link rel="stylesheet" href="(css\/[^"?]+)(?:\?v=[^"]*)?">/g, (_, p) => {
   const css = read(p).replace(/url\(\.\.\/(fonts\/[^)]+)\)/g, (m, f) => `url(${dataUri(f)})`);
   return `<style>\n${css}\n</style>`;
 });
@@ -22,7 +23,7 @@ html = html.replace(/<link rel="stylesheet" href="(css\/[^"]+)">/g, (_, p) => {
 html = html.replace(/(<link rel="(?:icon|apple-touch-icon)" href=")(assets\/[^"]+)"/g, (_, a, p) => `${a}${dataUri(p)}"`);
 html = html.replace(/<link rel="manifest"[^>]*>\n?/, '');
 html = html.replace(/<script>if \(\/\^https\?:\/[\s\S]*?<\/script>\n?/, '');
-html = html.replace(/<script src="([^"]+)"><\/script>/g, (_, p) => `<script>\n${read(p)}\n</script>`);
+html = html.replace(/<script src="([^"?]+)(?:\?v=[^"]*)?"><\/script>/g, (_, p) => `<script>\n${read(p)}\n</script>`);
 html = html.replace('</body>', `<script type="text/plain" id="three-src">\n${read('vendor/three.min.js')}\n</script>\n</body>`);
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });

@@ -63,7 +63,8 @@ js/kit.js               ชิ้นส่วนที่ใช้ซ้ำ: ร
 js/chapters.js          รายชื่อ 15 บทตามสารบัญ
 js/subjects/*.js        แบบจำลองแยกตามบท (fluid.js optics.js relativity.js คือชุดเดิมแบบภาพนิ่ง SVG)
 js/subjects/_template.js แม่แบบแบบจำลองใหม่ (ไม่ถูกโหลด)
-tools/build.js          รวมเป็นไฟล์เดียว
+tools/build.js          รวมเป็นไฟล์เดียว (เรียก stamp.js ให้อัตโนมัติ)
+tools/stamp.js          ใส่ ?v=แฮช ให้ css/js ใน index.html กันแคชเก่าหลัง deploy
 dist/tpat3-single.html  ผลจาก build
 ```
 
@@ -128,7 +129,7 @@ git commit -m "เริ่มต้นโปรเจกต์ ห้องท�
 ```
 
 ถ้ามี repo อยู่แล้ว ใช้ `git add -A` แล้ว `git commit` ตามปกติ
-แนะนำ commit แยกหนึ่งบทหรือหนึ่งแบบจำลองต่อครั้ง และรัน `node tools/build.js` ก่อน commit เพื่อให้ `dist/tpat3-single.html` เป็นเวอร์ชันล่าสุด
+แนะนำ commit แยกหนึ่งบทหรือหนึ่งแบบจำลองต่อครั้ง และรัน `node tools/build.js` ก่อน commit เพื่อให้ `dist/tpat3-single.html` เป็นเวอร์ชันล่าสุด และให้ index.html ได้ `?v=` ใหม่ (ผู้ใช้จะได้ไฟล์ใหม่ทันทีหลัง deploy ไม่ติดแคช)
 
 ## เครดิต
 
