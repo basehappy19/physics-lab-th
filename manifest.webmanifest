@@ -1,0 +1,18 @@
+{
+  "name": "ห้องทดลองฟิสิกส์ TPAT3",
+  "short_name": "ฟิสิกส์ TPAT3",
+  "description": "แบบจำลองฟิสิกส์โต้ตอบครบ 15 บทตามเนื้อหา TPAT3 ทั้ง 2D และ 3D",
+  "lang": "th",
+  "start_url": "./index.html#start",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef2f8",
+  "theme_color": "#007aff",
+  "categories": ["education"],
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

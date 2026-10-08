@@ -63,7 +63,22 @@ const Lab = (function () {
   // ---------- สถานะ ----------
   let si = -1, ci = -1, cur = null, P = {}, REF_P = {}, REF_O = {}, O = {};
   let st = null, playing = false, speed = 1, view = '2d', acc = 0, nextSample = 0, dirty = true, drag = null, hover = null, handles = [];
-  let G = null, GR = null, V3 = null, v3stale = true, lastLive = 0, lastGraph = 0;
+  let G = null, GR = null, V3 = null, v3stale = true, lastLive = 0, lastGraph = 0, lastLiveHtml = '', onScreen = true, slowT = 0;
+  // 3D: โหลด three.js และสร้าง WebGL เฉพาะเมื่อผู้ใช้เปิดมุมมอง 3D ครั้งแรก (ประหยัดหน่วยความจำและเวลาเปิดหน้า)
+  let HAS3 = false, loading3 = false;   // HAS3 ตั้งค่าใน start() หลังโหลด view3d.js
+  function loadThree() {
+    if (loading3) return; loading3 = true;
+    const done = ok => { loading3 = false; if (!ok || typeof THREE === 'undefined') { HAS3 = false; if (cur) { view = '2d'; renderToolbar(); resizeView(); } return; } ensure3(); };
+    const inl = document.getElementById('three-src'), s = document.createElement('script');
+    if (inl) { s.textContent = inl.textContent; document.head.appendChild(s); done(true); }
+    else { s.src = 'vendor/three.min.js'; s.onload = () => done(true); s.onerror = () => done(false); document.head.appendChild(s); }
+  }
+  function ensure3() {
+    if (V3 || !HAS3) return V3;
+    if (typeof THREE === 'undefined') { loadThree(); return null; }
+    try { V3 = new Lab.V3($('#v3host')); } catch (e) { V3 = null; HAS3 = false; console.warn('3D ใช้ไม่ได้บนเครื่องนี้', e); if (cur) { view = '2d'; renderToolbar(); } }
+    v3stale = true; dirty = true; resizeView(); return V3;
+  }
 
   const isRange = q => !q.type && !q.opts;
   const outsOf = c => typeof c.outs === 'function' ? c.outs(P, O) : (c.outs || []);
@@ -84,9 +99,10 @@ const Lab = (function () {
   // ไอคอนเส้นเรียบ (svg) ของแต่ละบท กำหนดใน chapters.js ผ่าน Lab.icons
   const icon = (id, sz = 22) => { const d = (Lab.icons || {})[id]; return d ? `<svg class="ic" width="${sz}" height="${sz}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>` : ''; };
   const showPage = which => { $('#landing').hidden = which !== 'landing'; $('#homeGrid').hidden = which !== 'toc'; $('#lab').hidden = which !== 'lab'; $('#hdr').hidden = which === 'landing'; };
+  const SITE = 'ห้องทดลองฟิสิกส์ TPAT3';
   const FEATURED = [['equil', 'คานแก้ไขได้', 'วางน้ำหนัก จุดรองรับ เชือก สปริง แล้วดูแรงทุกตัว'], ['newton', 'พื้นเอียง', 'ลากมุมและกล่องได้ ดูแรงเสียดทานสถิตกับจลน์'], ['proj', 'ยิงโพรเจกไทล์', 'เล็ง ย้ายเป้า เก็บรอยทางเทียบหลายนัด'], ['energy', 'รางเลื่อนแก้ไขได้', 'ปั้นรางเอง ดูพลังงานเปลี่ยนรูป'], ['elec', 'สนามและศักย์ไฟฟ้า', 'ลากประจุ ดูเส้นสนามและพื้นผิวศักย์ 3D'], ['env', 'แผงโซลาร์เซลล์', 'ดวงอาทิตย์เคลื่อนที่ทั้งวัน 3D']];
   function goLanding() {
-    si = -2; ci = -1; cur = null; playing = false; showPage('landing');
+    si = -2; ci = -1; cur = null; playing = false; showPage('landing'); document.title = SITE + ' — แบบจำลองฟิสิกส์โต้ตอบครบ 15 บท';
     $('#foot').textContent = '';
     const nCase = chapters.reduce((a, c) => a + c.cases.length, 0), n3 = chapters.reduce((a, c) => a + c.cases.filter(x => x.three).length, 0);
     const find = (cid, nm) => { const c = chap(cid); const k = c ? c.cases.findIndex(x => x.name === nm) : -1; return k >= 0 ? `#${cid}.${k}` : `#${cid}.0`; };
@@ -114,7 +130,7 @@ const Lab = (function () {
     const on = $('#subjects [aria-selected="true"]'); if (on) hscroll($('#subjects'), on);
   }
   function goHome() {
-    si = -1; ci = -1; cur = null; playing = false; showPage('toc');
+    si = -1; ci = -1; cur = null; playing = false; showPage('toc'); document.title = 'สารบัญแบบจำลอง · ' + SITE;
     $('#siteH1').textContent = 'สารบัญแบบจำลอง';
     $('#subjDesc').textContent = 'แบบจำลองโต้ตอบครบ 15 บทตามเนื้อหา TPAT3 ปรับค่าได้ละเอียด ลากย้ายวัตถุ เพิ่มหรือลบชิ้นส่วน ดูแอนิเมชันและกราฟสด ทั้ง 2D และ 3D';
     $('#foot').textContent = '';
@@ -217,6 +233,7 @@ const Lab = (function () {
   function selectCase(i) {
     const c = chapters[si].cases[i]; if (!c) return;
     ci = i; cur = c;
+    document.title = `${c.name} · บทที่ ${chapters[si].no} ${chapters[si].short || chapters[si].name} · ${SITE}`;
     P = {}; c.params.forEach(q => { if (q.id) P[q.id] = deepCopy(q.def); });
     REF_P = deepCopy(P); REF_O = c.compute(P);
     buildCaseTabs(); setHash();
@@ -227,7 +244,7 @@ const Lab = (function () {
     const isSim = !!(c.sim || c.three);
     $('#viewer').classList.toggle('is-sim', isSim);
     $('#svg').toggleAttribute('hidden', isSim); $('#cv').hidden = !isSim; $('#v3host').hidden = true;
-    view = c.sim && c.sim.draw ? '2d' : (c.three && V3 ? '3d' : '2d');
+    view = c.sim && c.sim.draw ? '2d' : (c.three && HAS3 ? '3d' : '2d');
     if (V3) V3.resetCam();
     playing = !!(c.sim && c.sim.step && c.sim.autoplay !== false);
     renderToolbar();
@@ -242,11 +259,11 @@ const Lab = (function () {
   function renderToolbar() {
     const c = cur, hasStep = !!(c.sim && c.sim.step);
     $('#vbar').hidden = !(c.sim || c.three);
-    $('#vbar').innerHTML = (c.three && V3 && c.sim && c.sim.draw ? `<div class="seg sm" id="vmode"><button data-v="2d" aria-pressed="${view === '2d'}">2D</button><button data-v="3d" aria-pressed="${view === '3d'}">3D</button></div>` : (c.three && V3 ? '<span class="tag">3D</span>' : '')) +
+    $('#vbar').innerHTML = (c.three && HAS3 && c.sim && c.sim.draw ? `<div class="seg sm" id="vmode"><button data-v="2d" aria-pressed="${view === '2d'}">2D</button><button data-v="3d" aria-pressed="${view === '3d'}">3D</button></div>` : (c.three && HAS3 ? '<span class="tag">3D</span>' : '')) +
       (hasStep ? `<button class="pb" id="play" aria-label="เล่น/หยุด"></button><button class="pb" id="restart" title="เริ่มใหม่">↺</button>` +
         `<label class="spd">ความเร็ว <select id="speed">${[0.1, 0.25, 0.5, 1, 2, 4].map(v => `<option value="${v}" ${v === speed ? 'selected' : ''}>${v}×</option>`).join('')}</select></label><span class="tm" id="tm"></span>` : '') +
       (c.actions || []).map((a, k) => `<button class="act" data-act="${k}">${a.label}</button>`).join('') +
-      (c.three && V3 ? `<button class="act" id="camreset" title="มุมกล้องเริ่มต้น" ${view === '3d' ? '' : 'hidden'}>มุมกล้องเริ่มต้น</button><div class="seg sm vecbar" id="v3vec" hidden></div>` : '');
+      (c.three && HAS3 ? `<button class="act" id="camreset" title="มุมกล้องเริ่มต้น" ${view === '3d' ? '' : 'hidden'}>มุมกล้องเริ่มต้น</button><div class="seg sm vecbar" id="v3vec" hidden></div>` : '');
     if (!$('#vbar').innerHTML.trim()) $('#vbar').hidden = true;
     const vm = $('#vmode'); if (vm) vm.onclick = e => { const b = e.target.closest('button'); if (!b) return; setView(b.dataset.v); };
     if (hasStep) {
@@ -256,8 +273,8 @@ const Lab = (function () {
       updPlay();
     }
     $('#vbar').querySelectorAll('[data-act]').forEach(b => b.onclick = () => { c.actions[+b.dataset.act].run(P, st, O); renderControls(); changed(true); });
-    const cr = $('#camreset'); if (cr) cr.onclick = () => { V3.resetCam(); v3stale = true; };
-    const vb = $('#v3vec'); if (vb) vb.onclick = e => { const b = e.target.closest('button'); if (!b) return; V3.toggle(b.dataset.k); b.setAttribute('aria-pressed', String(!!V3.show[b.dataset.k])); };
+    const cr = $('#camreset'); if (cr) cr.onclick = () => { if (V3) { V3.resetCam(); v3stale = true; } };
+    const vb = $('#v3vec'); if (vb) vb.onclick = e => { const b = e.target.closest('button'); if (!b) return; if (!V3) return; V3.toggle(b.dataset.k); b.setAttribute('aria-pressed', String(!!V3.show[b.dataset.k])); dirty = true; };
   }
   // ปุ่มเปิด/ปิดเวกเตอร์ในมุมมอง 3D (แสดงเฉพาะชนิดที่แบบจำลองนั้นใช้)
   function vecBar() {
@@ -324,9 +341,10 @@ const Lab = (function () {
     if (!(cur.sim || cur.three)) return;
     const asp = cur.aspect || (cur.sim && cur.sim.aspect) || 16 / 9;
     let h = Math.round(w / asp); h = clamp(h, 220, Math.max(260, Math.round(window.innerHeight * 0.68)));
-    const show3 = view === '3d' && cur.three && V3;
+    const show3 = !!(view === '3d' && cur.three && HAS3), v3 = show3 ? ensure3() : null;
     $('#cv').hidden = show3; $('#v3host').hidden = !show3;
-    if (show3) { V3.resize(w, h); $('#v3host').style.height = h + 'px'; } else G.resize(w, h);
+    if (show3) { if (v3) v3.resize(w, h); $('#v3host').style.height = h + 'px'; } else G.resize(w, h);
+    if (GR) GR.dirty = true;
     const gc = $('#gcv'); if (cur.plot && !$('#graphCard').hidden) { GR.g.resize(gc.parentElement.clientWidth, cur.plot.h || Math.max(160, Math.min(320, (cur.plot.x ? 1 : cur.plot.series.length) * 95))); }
     dirty = true; v3stale = v3stale || show3;
   }
@@ -342,15 +360,23 @@ const Lab = (function () {
     if (st.done) { if (sim.loop) { setTimeout(() => { if (cur === c && !playing) { rebuildSim(); playing = true; updPlay(); } }, 700); } playing = false; updPlay(); if (GR && c.plot) GR.push(st, P, O); }
   }
   let lastTs = 0;
+  let perf = 0;
   function frame(ts) {
-    requestAnimationFrame(frame);
+    requestAnimationFrame(frame); const t0 = performance.now(); work(ts); perf = perf * 0.95 + (performance.now() - t0) * 0.05;
+  }
+  function work(ts) {
     const realDt = Math.min(0.05, (ts - lastTs) / 1000 || 0); lastTs = ts;
     if (!cur || !(cur.sim || cur.three) || document.hidden) return;
     if (playing && cur.sim && cur.sim.step) { stepSim(realDt); dirty = true; }
-    const show3 = view === '3d' && cur.three && V3;
+    if (!onScreen) return;   // ภาพอยู่นอกจอ: คำนวณต่อแต่ไม่วาด
+    const show3 = view === '3d' && cur.three && HAS3;
     if (show3) {
-      if (v3stale) { V3.build(cur, P, O, true); v3stale = false; vecBar(); }
-      V3.render(st, P, O);
+      const v3 = ensure3(); if (!v3) return;
+      if (v3stale) { v3.build(cur, P, O, true); v3stale = false; vecBar(); dirty = true; }
+      // วาด 3D เฉพาะเมื่อมีการเปลี่ยนแปลง (เล่นอยู่ ปรับค่า หมุนกล้อง) ไม่วาดซ้ำตอนภาพนิ่ง
+      if (dirty || playing || v3.dirty) { v3.render(st, P, O); v3.dirty = false; dirty = false; }
+      // เครื่องช้า: ถ้าเฟรมเรตต่ำต่อเนื่องระหว่างเล่น ลดความละเอียด 3D อัตโนมัติ
+      if (playing) { slowT = realDt > 1 / 35 ? slowT + realDt : Math.max(0, slowT - realDt); if (slowT > 1.5) { slowT = 0; v3.degrade(); resizeView(); } }
     } else if (dirty && cur.sim && cur.sim.draw) {
       G.clear(); G.frame(cur.sim.view(P, O, st)); cur.sim.draw(G, st, P, O);
       handles = cur.handles ? cur.handles(P, O, st) : [];
@@ -359,11 +385,11 @@ const Lab = (function () {
     }
     if (ts - lastLive > 100) {
       lastLive = ts;
-      const tm = $('#tm'); if (tm) tm.textContent = 't = ' + st.t.toFixed(2) + ' s';
-      if (cur.live) $('#live').innerHTML = cur.live.map(l => `<span class="lv"><span class="n">${l.name}</span> <b>${fmt(l.f(st, P, O))}</b> <span class="u">${l.unit || ''}</span></span>`).join('');
-      else $('#live').innerHTML = '';
+      const tm = $('#tm'), ts2 = 't = ' + st.t.toFixed(2) + ' s'; if (tm && tm.textContent !== ts2) tm.textContent = ts2;
+      const html = cur.live ? cur.live.map(l => `<span class="lv"><span class="n">${l.name}</span> <b>${fmt(l.f(st, P, O))}</b> <span class="u">${l.unit || ''}</span></span>`).join('') : '';
+      if (html !== lastLiveHtml) { $('#live').innerHTML = html; lastLiveHtml = html; }   // เขียน DOM เฉพาะเมื่อค่าเปลี่ยน
     }
-    if (GR && cur.plot && (playing || ts - lastGraph > 400)) { if (ts - lastGraph > 50) { GR.draw(); lastGraph = ts; } }
+    if (GR && cur.plot && GR.dirty && ts - lastGraph > 50) { GR.draw(); GR.dirty = false; lastGraph = ts; }
   }
 
   // ---------- ลากวัตถุ (sim) ----------
@@ -405,7 +431,8 @@ const Lab = (function () {
   function start() {
     G = new Lab.G2($('#cv'));
     GR = Lab.Graph ? new Lab.Graph($('#gcv')) : null;
-    try { V3 = Lab.V3 ? new Lab.V3($('#v3host')) : null; } catch (e) { V3 = null; console.warn('3D ใช้ไม่ได้บนเครื่องนี้', e); }
+    HAS3 = !!(Lab.V3 && window.WebGLRenderingContext);
+    if (window.IntersectionObserver) new IntersectionObserver(es => { onScreen = es[0].isIntersecting; if (onScreen) dirty = true; }).observe($('#viewer'));
     bindCanvas();
     $('#glegend').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; GR.toggle(+b.dataset.g); b.parentElement.querySelectorAll('button').forEach((x, k) => x.setAttribute('aria-pressed', String(GR.on[k]))); resizeView(); GR.draw(); });
     $('#themebtn').onclick = () => {
@@ -429,6 +456,8 @@ const Lab = (function () {
     go: (i, j) => go(i, j),
     run(sec) { if (!cur || !cur.sim || !cur.sim.step) return 0; const h = cur.sim.dt || 1 / 240; let n = 0; while (st.t < sec && !st.done && n < 200000) { cur.sim.step(st, h, P, O); st.t += h; n++; if (GR && cur.plot && st.t >= nextSample) { GR.push(st, P, O); nextSample = st.t + ((cur.plot && cur.plot.dt) || 1 / 60); } } dirty = true; return st.t; },
     state: () => ({ st, P, O, playing, view }),
+    perf: () => perf, resetPerf() { perf = 0; },
+    play() { playing = true; updPlay(); },
     setView, pause() { playing = false; updPlay(); }
   };
 

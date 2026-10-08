@@ -8,16 +8,16 @@
 function Graph(canvas) { this.g = new Lab.G2(canvas); this.def = null; this.data = []; }
 const P = Graph.prototype;
 P.setup = function (def) { this.def = def; this.on = def ? def.series.map(s => s.on !== false) : []; this.reset(); };
-P.reset = function () { this.data = []; };
+P.reset = function () { this.data = []; this.dirty = true; };
 P.push = function (st, Pm, o) {
   if (!this.def) return;
   const x = this.def.x ? this.def.x.f(st, Pm, o) : st.t;
   const ys = this.def.series.map(s => s.f(st, Pm, o));
   if (!isFinite(x)) return;
-  this.data.push([x, ys]);
+  this.data.push([x, ys]); this.dirty = true;
   if (this.data.length > 6000) this.data = this.data.filter((_, i) => i % 2 === 0);
 };
-P.toggle = function (i) { this.on[i] = !this.on[i]; if (!this.on.some(Boolean)) this.on[i] = true; };
+P.toggle = function (i) { this.dirty = true; this.on[i] = !this.on[i]; if (!this.on.some(Boolean)) this.on[i] = true; };
 const nice = (lo, hi) => {
   if (!isFinite(lo) || !isFinite(hi)) return [0, 1];
   if (hi - lo < 1e-9) { const d = Math.abs(hi) * 0.1 || 1; lo -= d; hi += d; }

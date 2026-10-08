@@ -48,9 +48,13 @@
 ## โครงสร้างโปรเจกต์
 
 ```
-index.html              โครงหน้าเว็บและรายการ <script>
+index.html              โครงหน้าเว็บ metadata (SEO, Open Graph, Twitter, JSON-LD) และรายการ <script>
+manifest.webmanifest    ข้อมูลแอปสำหรับติดตั้งบนมือถือ/คอม (PWA)
+assets/                 ไอคอน (icon.svg favicon-32 apple-touch-icon icon-192/512 maskable) และรูปตัวอย่างเว็บ og-image.png 1200×630
+fonts/                  ฟอนต์ IBM Plex Sans Thai/Mono แบบ woff2 (SIL OFL) ใช้ออฟไลน์ได้
+css/fonts.css           @font-face ของฟอนต์ข้างบน
 css/style.css           สไตล์ทั้งหมด (สีเป็น token รองรับโหมดมืด)
-vendor/three.min.js     three.js r149 สำหรับมุมมอง 3D (MIT License)
+vendor/three.min.js     three.js r149 สำหรับมุมมอง 3D (MIT License) โหลดเมื่อเปิด 3D ครั้งแรกเท่านั้น
 js/engine.js            แกนกลาง: เมนูบท แผงควบคุม รายการเพิ่ม/ลบ แอนิเมชัน ลากวัตถุ ตารางทิศทาง
 js/draw2d.js            ตัวช่วยวาด 2D บน canvas ด้วยพิกัดเมตร (Lab.G2)
 js/graph.js             กราฟสด (Lab.Graph)
@@ -62,6 +66,19 @@ js/subjects/_template.js แม่แบบแบบจำลองใหม่ 
 tools/build.js          รวมเป็นไฟล์เดียว
 dist/tpat3-single.html  ผลจาก build
 ```
+
+## ประสิทธิภาพ
+
+- โหลด three.js และสร้าง WebGL เฉพาะเมื่อเปิดมุมมอง 3D ครั้งแรก หน้าแรก สารบัญ และ 2D จึงเปิดเร็วและใช้หน่วยความจำน้อย
+- วาดภาพใหม่เฉพาะเมื่อมีการเปลี่ยนแปลง (เล่นแอนิเมชัน ปรับค่า ลาก หมุนกล้อง) ตอนภาพนิ่งแทบไม่ใช้ CPU/GPU
+- หยุดวาดเมื่อภาพเลื่อนพ้นจอหรือสลับแท็บ ตัวเลขสดและกราฟเขียนเฉพาะเมื่อค่าเปลี่ยน
+- 3D จำกัดความละเอียดบนจอความหนาแน่นสูง และถ้าเฟรมเรตต่ำต่อเนื่องจะลดความละเอียด/ปิดเงาเองอัตโนมัติ
+- เบลอกระจกจริงเฉพาะแถบเมนูที่ลอยอยู่ การ์ดอื่นใช้สีโปร่งแสง วอลเปเปอร์อยู่บนชั้นคงที่ ไม่ต้องวาดใหม่ตอนเลื่อนหน้า
+
+## Metadata และรูปตัวอย่างเว็บ
+
+`og:image` และ `twitter:image` ใน `index.html` ตอนนี้เป็นพาธสัมพัทธ์ `assets/og-image.png` เมื่อนำขึ้นโฮสต์จริงให้เปลี่ยนเป็น URL เต็ม เช่น `https://<โดเมน>/assets/og-image.png` และเพิ่ม `<meta property="og:url" content="https://<โดเมน>/">` กับ `<link rel="canonical" href="https://<โดเมน>/">` เพื่อให้ Facebook LINE Discord แสดงรูปตัวอย่างได้ถูกต้อง
+ชื่อแท็บเบราว์เซอร์เปลี่ยนตามหน้าที่เปิดอยู่ (หน้าแรก สารบัญ หรือชื่อแบบจำลอง)
 
 ## เพิ่มแบบจำลองใหม่
 
@@ -117,4 +134,5 @@ git commit -m "เริ่มต้นโปรเจกต์ ห้องท�
 
 - ผู้สร้าง: **IG: base_happy19** — [instagram.com/base_happy19](https://www.instagram.com/base_happy19/)
 - three.js © three.js authors, MIT License (`vendor/three.LICENSE`)
+- ฟอนต์ IBM Plex Sans Thai / IBM Plex Mono © IBM Corp., SIL Open Font License 1.1 (`fonts/OFL.txt`)
 - หัวข้อบทเรียงตามสารบัญเอกสารติว TPAT3 ของ SmartMathPro × Physics Farm แบบจำลองและคำอธิบายในโปรเจกต์นี้เขียนขึ้นเอง ไม่ได้คัดลอกเนื้อหาเอกสารต้นฉบับ

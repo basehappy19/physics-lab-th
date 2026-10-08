@@ -5,15 +5,17 @@
  */
 (function () {
 'use strict';
-if (typeof THREE === 'undefined') { Lab.V3 = null; return; }
+// THREE ถูกโหลดภายหลังเมื่อเปิด 3D ครั้งแรก (ดู ensure3 ใน engine.js) ตัวแปร THREE จึงถูกอ้างถึงเฉพาะตอนเรียกใช้
 
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888';
 const color = c => new THREE.Color(c && c[0] === '-' ? css(c) : (c || '#888'));
 
 function V3(host) {
   this.host = host;
-  this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
-  this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'default' });
+  // จำกัดความละเอียดเพื่อลดภาระ GPU (จอมือถือ/จอ retina ไม่ต้องเรนเดอร์เต็ม 3×)
+  this.dpr = Math.min(window.devicePixelRatio || 1, matchMedia('(pointer:coarse)').matches ? 1.5 : 1.75);
+  this.renderer.setPixelRatio(this.dpr);
   this.renderer.shadowMap.enabled = true;
   this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   host.appendChild(this.renderer.domElement);
@@ -44,9 +46,9 @@ P._bindControls = function () {
   });
   el.addEventListener('pointerup', () => { drag = null; });
   el.addEventListener('contextmenu', e => e.preventDefault());
-  el.addEventListener('wheel', e => { e.preventDefault(); this.orb.r *= Math.exp(e.deltaY * 0.0012); this.orb.r = Math.max(0.2, Math.min(4000, this.orb.r)); }, { passive: false });
+  el.addEventListener('wheel', e => { e.preventDefault(); this.dirty = true; this.orb.r *= Math.exp(e.deltaY * 0.0012); this.orb.r = Math.max(0.2, Math.min(4000, this.orb.r)); }, { passive: false });
 };
-P.resize = function (w, h) { this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.w = w; this.h = h; };
+P.resize = function (w, h) { if (w === this.w && h === this.h && !this._force) return; this._force = false; this.dirty = true; this.renderer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.w = w; this.h = h; };
 P.setCam = function (pos, target) {
   const t = new THREE.Vector3(...target), p = new THREE.Vector3(...pos).sub(t);
   this.orb.target.copy(t); this.orb.r = p.length(); this.orb.ph = Math.acos(Math.max(-1, Math.min(1, p.y / this.orb.r))); this.orb.th = Math.atan2(p.x, p.z);
@@ -70,6 +72,7 @@ P.build = function (cs, Pm, o, keepCam) {
   const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(8, 18, 10); sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024); const sc = cs.three.shadow || 20;
   Object.assign(sun.shadow.camera, { left: -sc, right: sc, top: sc, bottom: -sc, near: 0.5, far: 200 }); sun.shadow.bias = -0.0005;
+  if (this.noShadow) sun.castShadow = false;
   scene.add(sun); this.sun = sun;
   this.layers = { f: new THREE.Group(), v: new THREE.Group(), line: new THREE.Group() };
   Object.values(this.layers).forEach(g => scene.add(g));
@@ -78,8 +81,14 @@ P.build = function (cs, Pm, o, keepCam) {
   this.T = T;
   this.obj = cs.three.build(T, Pm, o) || {};
 };
-P.resetCam = function () { this._camSet = false; };
-P.toggle = function (k) { this.show[k] = !this.show[k]; try { localStorage.setItem('tpat3.vec3d', JSON.stringify(this.show)); } catch (e) { } };
+P.resetCam = function () { this._camSet = false; this.dirty = true; };
+// เครื่องช้า: ลดความละเอียดและปิดเงา
+P.degrade = function () {
+  if (this.dpr > 1) { this.dpr = 1; this.renderer.setPixelRatio(1); }
+  else if (this.sun && this.sun.castShadow) { this.noShadow = true; this.sun.castShadow = false; }
+  this._force = true; this.dirty = true;
+};
+P.toggle = function (k) { this.dirty = true; this.show[k] = !this.show[k]; try { localStorage.setItem('tpat3.vec3d', JSON.stringify(this.show)); } catch (e) { } };
 P.render = function (st, Pm, o) {
   if (!this.scene) return;
   if (this.cs.three.update) this.cs.three.update(this.obj, st, Pm, o, this.T);
@@ -89,17 +98,18 @@ P.render = function (st, Pm, o) {
   // ป้ายข้อความ
   const v = new THREE.Vector3(), u = new THREE.Vector3();
   this.labels.forEach(l => {
-    if (!l.visible || (l.kind && (!this.show[l.kind] || !this.show.val || (l.arrow && !l.arrow.visible)))) { l.el.style.display = 'none'; return; }
+    if (!l.visible || (l.kind && (!this.show[l.kind] || !this.show.val || (l.arrow && !l.arrow.visible)))) { if (l.el.style.display !== 'none') l.el.style.display = 'none'; return; }
     v.copy(l.pos).project(this.camera);
-    if (v.z > 1) { l.el.style.display = 'none'; return; }
-    l.el.style.display = '';
+    if (v.z > 1) { if (l.el.style.display !== 'none') l.el.style.display = 'none'; return; }
+    if (l.el.style.display) l.el.style.display = '';
     let px = (v.x + 1) / 2 * this.w, py = (1 - v.y) / 2 * this.h;
     if (l.push && l.from) {   // ป้ายของเวกเตอร์: เลื่อนออกไปตามทิศลูกศรบนจอ ไม่ให้บังหัวลูกศร
       u.copy(l.from).project(this.camera); let dx = px - (u.x + 1) / 2 * this.w, dy = py - (1 - u.y) / 2 * this.h; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
-      const bw = l.el.offsetWidth / 2, bh = l.el.offsetHeight / 2, m = 6 + Math.min(bw / Math.max(Math.abs(dx), 1e-3), bh / Math.max(Math.abs(dy), 1e-3));
+      if (!l.sz || !l.sz[0]) l.sz = [l.el.offsetWidth / 2, l.el.offsetHeight / 2];   // วัดขนาดป้ายครั้งเดียว (วัดทุกเฟรมทำให้เบราว์เซอร์จัดหน้าใหม่ซ้ำๆ)
+      const bw = l.sz[0], bh = l.sz[1], m = 6 + Math.min(bw / Math.max(Math.abs(dx), 1e-3), bh / Math.max(Math.abs(dy), 1e-3));
       px += dx * m; py += dy * m;
     }
-    l.el.style.transform = `translate(-50%,-50%) translate(${px}px,${py}px)`;
+    const tr = `translate(-50%,-50%) translate(${px.toFixed(1)}px,${py.toFixed(1)}px)`; if (tr !== l.tr) { l.el.style.transform = tr; l.tr = tr; }
   });
 };
 
@@ -185,7 +195,7 @@ P.helpers = function () {
     label(text, c, o = {}) {
       const el = document.createElement('span'); el.className = 'lab3d'; el.textContent = text; if (c) el.style.color = css(c);
       self.labelLayer.appendChild(el);
-      const l = { el, pos: new THREE.Vector3(...(o.pos || [0, 0, 0])), visible: true, set(t, p) { if (t != null && el.textContent !== t) el.textContent = t; if (p) l.pos.set(...p); return l; } };
+      const l = { el, pos: new THREE.Vector3(...(o.pos || [0, 0, 0])), visible: true, set(t, p) { if (t != null && el.textContent !== t) { if (t.length !== el.textContent.length) l.sz = null; el.textContent = t; } if (p) l.pos.set(...p); return l; } };
       self.labels.push(l); return l;
     },
     // ทรงจากเส้นขอบ 2D (shape แกน xy) ดึงความหนา d ตามแกน z
